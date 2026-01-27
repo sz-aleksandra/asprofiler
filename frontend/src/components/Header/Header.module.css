@@ -1,0 +1,49 @@
+.topbar {
+  height: 72px;
+  background: linear-gradient(90deg, #05061a, #0b0d2c);
+  display: flex;
+  align-items: center;
+  color: white;
+}
+
+.inner {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.brand {
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.accent {
+  color: #ff4d2d;
+  margin-right: 6px;
+}
+
+.tabs {
+  display: flex;
+  gap: 18px;
+}
+
+.tab {
+  padding: 10px 8px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: white;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.tab:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.active {
+  background: rgba(255, 255, 255, 0.14);
+}
