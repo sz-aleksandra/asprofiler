@@ -1,0 +1,15 @@
+.footer {
+  height: 64px;
+  background: linear-gradient(90deg, #05061a, #0b0d2c);
+  color: white;
+  display: flex;
+  align-items: center;
+}
+
+.footerInner {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  padding: 0 24px;
+  text-align: center;
+  opacity: 0.9;
+}
