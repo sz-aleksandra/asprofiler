@@ -1,15 +1,13 @@
 .footer {
-  height: 64px;
-  background: linear-gradient(90deg, #05061a, #0b0d2c);
-  color: white;
   display: flex;
   align-items: center;
+  background: var(--black);
+  color: var(--white);
 }
 
-.footerInner {
-  width: min(1200px, 100%);
-  margin: 0 auto;
-  padding: 0 24px;
+.inner {
+  width: 100%;
+  padding: 16px 24px;
+  align-items: center;
   text-align: center;
-  opacity: 0.9;
 }

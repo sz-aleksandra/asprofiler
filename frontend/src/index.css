@@ -11,6 +11,10 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  --black: #000123;
+  --red: #fe4321;
+  --white: #f0f0f0;
 }
 
 html,
@@ -21,17 +25,4 @@ body,
 
 body {
   margin: 0;
-  background: #ffffff;
-  color: #111111;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-h1 {
-  margin: 0 0 16px 0;
-  font-size: 32px;
-  line-height: 1.2;
 }

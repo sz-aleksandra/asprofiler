@@ -3,10 +3,11 @@ import styles from "./Header.module.css";
 
 export default function Header() {
   return (
-    <header className={styles.topbar}>
+    <header className={styles.header}>
       <div className={styles.inner}>
         <div className={styles.brand}>
-          <span className={styles.accent}>AS</span> Profiler
+          <span className={styles.accent}>AS</span>
+          Profiler
         </div>
 
         <nav className={styles.tabs}>
@@ -17,16 +18,16 @@ export default function Header() {
             About
           </NavLink>
           <NavLink
-            to="/files"
-            className={({ isActive }) => `${styles.tab} ${isActive ? styles.active : ""}`}
-          >
-            Files List
-          </NavLink>
-          <NavLink
             to="/upload"
             className={({ isActive }) => `${styles.tab} ${isActive ? styles.active : ""}`}
           >
             Upload Files
+          </NavLink>
+          <NavLink
+            to="/files"
+            className={({ isActive }) => `${styles.tab} ${isActive ? styles.active : ""}`}
+          >
+            Files List
           </NavLink>
         </nav>
       </div>

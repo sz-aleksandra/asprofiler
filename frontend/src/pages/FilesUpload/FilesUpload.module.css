@@ -1,0 +1,11 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  color: var(--black);
+}

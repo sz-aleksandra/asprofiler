@@ -14,11 +14,10 @@ module.exports = {
     "plugin:react-hooks/recommended",
     "plugin:jsx-a11y/recommended",
     "plugin:import/recommended",
-    "plugin:prettier/recommended", // włącza prettier jako regułę ESLint + wyłącza konflikty
+    "plugin:prettier/recommended",
   ],
   rules: {
-    "react/react-in-jsx-scope": "off", // Vite/React 17+ nie wymaga importu React
-    "prettier/prettier": "error",
+    "react/react-in-jsx-scope": "off",
     "import/order": [
       "warn",
       {

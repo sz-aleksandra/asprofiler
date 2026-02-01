@@ -1,0 +1,20 @@
+.zone {
+  border: 1px dashed var(--black);
+  border-radius: 16px;
+  padding: 72px;
+  cursor: pointer;
+  user-select: none;
+  text-align: center;
+}
+
+.zone:hover {
+  border: 1px solid;
+}
+
+.over {
+  border: 1px solid;
+}
+
+.hidden {
+  display: none;
+}

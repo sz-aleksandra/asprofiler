@@ -1,49 +1,49 @@
-.topbar {
-  height: 72px;
-  background: linear-gradient(90deg, #05061a, #0b0d2c);
+.header {
   display: flex;
   align-items: center;
-  color: white;
+  background: var(--black);
+  color: var(--white);
 }
 
 .inner {
-  width: min(1200px, 100%);
-  margin: 0 auto;
-  padding: 0 24px;
+  width: 100%;
+  padding: 16px 24px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
 }
 
 .brand {
-  font-size: 26px;
-  font-weight: 800;
+  font-size: 24px;
 }
 
 .accent {
-  color: #ff4d2d;
-  margin-right: 6px;
+  color: var(--red);
+  font-weight: 800;
 }
 
 .tabs {
   display: flex;
-  gap: 18px;
+  gap: 12px;
 }
 
 .tab {
-  padding: 10px 8px;
-  border-radius: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: solid 1px var(--white);
   text-decoration: none;
-  color: white;
   font-weight: 600;
-  opacity: 0.9;
+  color: var(--white);
 }
 
 .tab:hover {
-  opacity: 1;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--white);
+  border: solid 1px var(--black);
+  color: var(--black);
 }
 
 .active {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--white);
+  border: solid 1px var(--black);
+  color: var(--black);
 }
