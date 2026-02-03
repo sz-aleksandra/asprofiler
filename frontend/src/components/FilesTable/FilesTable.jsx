@@ -6,17 +6,36 @@ export default function FilesTable({
   selected,
   onToggleOne,
   onToggleAll,
+  busy,
+  mode = "delete",
   onDeleteOne,
   onDeleteSelected,
-  busy,
+  onAnalyzeOne,
+  onAnalyzeSelected,
 }) {
   const allSelected = useMemo(() => {
     if (!files.length) return false;
     return files.every((f) => selected.has(f.name));
   }, [files, selected]);
 
+  const anySelected = selected.size > 0;
+
+  const isDelete = mode === "delete";
+  const primaryLabel = isDelete ? "Delete selected" : "Analyze selected";
+  const rowLabel = isDelete ? "Delete" : "Analyze";
+
+  const onPrimary = () => {
+    if (isDelete) onDeleteSelected?.();
+    else onAnalyzeSelected?.();
+  };
+
+  const onRowAction = (name) => {
+    if (isDelete) onDeleteOne?.(name);
+    else onAnalyzeOne?.(name);
+  };
+
   return (
-    <section className={styles.wrap}>
+    <section className={styles.card}>
       <div className={styles.toolbar}>
         <div className={styles.left}>
           <label className={styles.selectAll}>
@@ -35,11 +54,11 @@ export default function FilesTable({
         </div>
 
         <button
-          className={styles.dangerBtn}
-          onClick={onDeleteSelected}
-          disabled={selected.size === 0 || busy}
+          className={isDelete ? styles.dangerBtn : styles.primaryBtn}
+          onClick={onPrimary}
+          disabled={!anySelected || busy}
         >
-          Delete selected
+          {primaryLabel}
         </button>
       </div>
 
@@ -69,18 +88,18 @@ export default function FilesTable({
 
               <div className={styles.cellActions}>
                 <button
-                  className={styles.dangerBtn}
-                  onClick={() => onDeleteOne(f.name)}
+                  className={isDelete ? styles.linkDanger : styles.linkPrimary}
+                  onClick={() => onRowAction(f.name)}
                   disabled={busy}
                 >
-                  Delete
+                  {rowLabel}
                 </button>
               </div>
             </div>
           );
         })}
 
-        {!files.length && <div className={styles.empty}>No files uploaded yet.</div>}
+        {!files.length && <div className={styles.empty}>No files available.</div>}
       </div>
     </section>
   );

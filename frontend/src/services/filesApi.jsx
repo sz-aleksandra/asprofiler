@@ -1,8 +1,4 @@
-let store = [
-  { name: "example1.txt", size: 1532 },
-  { name: "report.csv", size: 24011 },
-  { name: "image.png", size: 342901 },
-];
+let store = [];
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 

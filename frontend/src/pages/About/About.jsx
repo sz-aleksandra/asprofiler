@@ -15,7 +15,10 @@ export default function About() {
       </p>
 
       <p className={styles.disclaimer}>
-        <strong>This application is developed as part of an engineering thesis.</strong>
+        <strong>
+          This application was developed as part of an engineering thesis in Computer Science at the
+          Faculty of Electronics and Information Technology, Warsaw University of Technology.
+        </strong>
       </p>
 
       <h2 className={styles.subtitle}>References</h2>

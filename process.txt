@@ -5,3 +5,5 @@ npm? yes
 npm i -D eslint prettier eslint-config-prettier eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-import eslint-plugin-jsx-a11y eslint-plugin-prettier
 
 npm install react-router-dom
+
+npm run dev

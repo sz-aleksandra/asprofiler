@@ -27,7 +27,7 @@
 .dangerBtn {
   background: var(--red);
   color: var(--white);
-  border: 0;
+  border: 1px solid var(--white);
   border-radius: 6px;
   padding: 8px 12px;
   font-weight: 600;
@@ -36,6 +36,40 @@
 
 .dangerBtn:disabled {
   opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dangerBtn:hover {
+  background: red;
+  color: white;
+  border: 1px solid white;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+.linkDanger {
+  background: var(--red);
+  color: var(--white);
+  border: 1px solid var(--white);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkDanger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.linkDanger:hover {
+  background: red;
+  color: white;
+  border: 1px solid white;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
 }
 
 .row {
@@ -74,4 +108,54 @@
 
 .empty {
   color: var(--black);
+}
+
+.primaryBtn {
+  background: var(--white);
+  color: var(--red);
+  border: 1px solid var(--red);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.primaryBtn:hover {
+  background: white;
+  color: red;
+  border: 1px solid red;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkPrimary {
+  background: var(--white);
+  color: var(--red);
+  border: 1px solid var(--red);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.linkPrimary:hover {
+  background: white;
+  color: red;
+  border: 1px solid red;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
 }
