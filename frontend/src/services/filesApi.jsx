@@ -1,36 +1,42 @@
-let store = [];
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+async function request(path, options) {
+  const res = await fetch(`${API_BASE}${path}`, options);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Request failed: ${res.status}`);
+  }
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) return res.json();
+  return res.text();
+}
 
 export async function listFiles() {
-  await wait(150);
-  return [...store];
+  return request("/files");
 }
 
 export async function uploadFiles(files) {
-  await wait(250);
-  for (const f of files) {
-    const base = f.name;
-    let name = base;
-    let i = 1;
-    while (store.some((x) => x.name === name)) {
-      name = `${base.replace(/(\.[^.]*)?$/, "")} (${i})${base.match(/\.[^.]*$/)?.[0] || ""}`;
-      i += 1;
-    }
-    store.push({ name, size: f.size ?? 0 });
-  }
-  return { ok: true };
+  const body = new FormData();
+  for (const f of files) body.append("files", f);
+  return request("/files", { method: "POST", body });
 }
 
 export async function deleteFile(name) {
-  await wait(150);
-  store = store.filter((x) => x.name !== name);
-  return { ok: true };
+  return request(`/files/${encodeURIComponent(name)}`, { method: "DELETE" });
 }
 
 export async function deleteFiles(names) {
-  await wait(200);
-  const set = new Set(names);
-  store = store.filter((x) => !set.has(x.name));
-  return { ok: true };
+  return request("/files/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ names }),
+  });
+}
+
+export async function analyzeFiles(names, params) {
+  return request("/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ names, params }),
+  });
 }

@@ -1,0 +1,53 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  color: var(--black);
+}
+
+.viewToggle {
+  display: flex;
+  gap: 10px;
+}
+
+.toggle {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--red);
+  background: var(--white);
+  color: var(--red);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid red;
+  background: white;
+  color: red;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.toggleActive {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--red);
+  background: var(--red);
+  color: var(--white);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.empty {
+  border-radius: 16px;
+  padding: 8px;
+  background: white;
+  color: var(--black);
+}

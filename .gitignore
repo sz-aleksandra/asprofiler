@@ -24,3 +24,9 @@ dist-ssr
 *.sw?
 
 .vscode
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+backend/data/

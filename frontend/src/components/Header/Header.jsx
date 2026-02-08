@@ -29,6 +29,12 @@ export default function Header() {
           >
             Files List
           </NavLink>
+          <NavLink
+            to="/analysis"
+            className={({ isActive }) => `${styles.tab} ${isActive ? styles.active : ""}`}
+          >
+            Analysis
+          </NavLink>
         </nav>
       </div>
     </header>

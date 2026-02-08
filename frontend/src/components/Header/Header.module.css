@@ -37,9 +37,9 @@
 }
 
 .tab:hover {
-  background: var(--white);
-  border: solid 1px var(--black);
-  color: var(--black);
+  background: black;
+  border: solid 1px white;
+  color: white;
 }
 
 .active {

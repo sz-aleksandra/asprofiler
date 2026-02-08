@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import FilesTable from "../../components/FilesTable/FilesTable";
 import Toast from "../../components/Toast/Toast";
 
-import { listFiles } from "../../services/filesApi";
+import { useNavigate } from "react-router-dom";
+import { analyzeFiles, listFiles } from "../../services/filesApi";
 
 import styles from "./FilesList.module.css";
 
@@ -12,6 +13,7 @@ export default function FilesList() {
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState({ message: "", type: "info" });
+  const navigate = useNavigate();
 
   const closeToast = () => setToast({ message: "", type: "info" });
 
@@ -45,7 +47,25 @@ export default function FilesList() {
   const onAnalyzeOne = async (name) => {
     setBusy(true);
     try {
-      setToast({ message: `Analyzing: ${name}`, type: "success" });
+      const res = await analyzeFiles([name]);
+      const first = res?.results?.[0]?.profile?.fit;
+      if (first) {
+        const payload = [{ name, profile: res.results[0].profile }];
+        localStorage.setItem("analysis_results", JSON.stringify(payload));
+        navigate("/analysis", {
+          state: { results: payload },
+        });
+        setToast({
+          message: `Analyzed ${name}. A0=${first.A0.toFixed(3)}, S0=${first.S0.toFixed(
+            3,
+          )}, slope=${first.AS_slope.toFixed(3)}, R²=${first.r2.toFixed(3)}`,
+          type: "success",
+        });
+      } else {
+        setToast({ message: `Analyzed ${name}.`, type: "success" });
+      }
+    } catch (e) {
+      setToast({ message: String(e.message || e), type: "error" });
     } finally {
       setBusy(false);
     }
@@ -55,12 +75,24 @@ export default function FilesList() {
     if (!selected.size) return;
     setBusy(true);
     try {
+      const res = await analyzeFiles([...selected]);
+      const okResults = res?.results?.filter((r) => r.profile) || [];
+      const ok = okResults.length;
+      if (okResults[0]) {
+        const payload = okResults.map((r) => ({ name: r.name, profile: r.profile }));
+        localStorage.setItem("analysis_results", JSON.stringify(payload));
+        navigate("/analysis", {
+          state: { results: payload },
+        });
+      }
       setToast({
-        message: `Analyzing ${selected.size} file(s): ${[...selected].slice(0, 3).join(", ")}${
+        message: `Analyzed ${ok}/${selected.size} file(s): ${[...selected].slice(0, 3).join(", ")}${
           selected.size > 3 ? "…" : ""
         }`,
-        type: "success",
+        type: ok ? "success" : "error",
       });
+    } catch (e) {
+      setToast({ message: String(e.message || e), type: "error" });
     } finally {
       setBusy(false);
     }
