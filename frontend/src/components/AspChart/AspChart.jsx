@@ -10,6 +10,9 @@ export default function AspChart({
   colorMap,
   defaultColor,
   hiddenMap,
+  onPointSelect,
+  selectedPoints,
+  pointWindow,
 }) {
   const containerRef = useRef(null);
 
@@ -22,19 +25,71 @@ export default function AspChart({
     const allTraces = [];
     const shapes = [];
     const globalMinSpeed = Math.min(...valid.map((v) => Number(v.profile?.meta?.min_speed ?? 0)));
-    const globalMaxSpeed = Math.max(
-      ...valid.flatMap((v) => (v.profile?.all_points || []).map((p) => p.speed)),
-    );
+    const maxSpeedCandidates = valid.flatMap((v) => v.profile?.timeseries?.speed || []);
+    const globalMaxSpeed = maxSpeedCandidates.length ? Math.max(...maxSpeedCandidates) : 0;
 
     valid.forEach((item) => {
       const base = colorMap?.[item.name] || defaultColor || null;
       const profile = item.profile;
       const cutoff = Number(profile?.meta?.min_speed ?? 0);
-      const all = profile.all_points || [];
+      const { time: tsTime = [], speed: tsSpeed = [], acceleration: tsAccel = [] } =
+        profile?.timeseries || {};
+      const positiveOnly = Boolean(profile?.meta?.positive_only);
+      const toKey = (speed, accel) =>
+        `${Number(speed).toFixed(6)}|${Number(accel).toFixed(6)}`;
+
+      const all = (tsTime || [])
+        .map((t, i) => ({
+          index: i,
+          time: Number(t),
+          speed: Number(tsSpeed[i]),
+          accel: Number(tsAccel[i]),
+        }))
+        .filter((p) => !positiveOnly || p.accel > 0);
+
       const sortedAll = [...all].sort((a, b) => a.speed - b.speed);
       const included = sortedAll.filter((p) => p.speed >= cutoff);
       const rejected = sortedAll.filter((p) => p.speed < cutoff);
-      const selected = profile.points || [];
+      const selectedRaw = Array.isArray(profile?.points) ? profile.points : [];
+      let selected = selectedRaw;
+      if (
+        !selected.every((p) => Number.isInteger(p?.index) && Number.isFinite(Number(p?.time)))
+      ) {
+        const buckets = new Map();
+        all.forEach((p) => {
+          const key = toKey(p.speed, p.accel);
+          const list = buckets.get(key) || [];
+          list.push(p);
+          buckets.set(key, list);
+        });
+        selected = selectedRaw
+          .map((p) => {
+            const key = toKey(p?.speed, p?.accel);
+            const list = buckets.get(key);
+            if (list?.length) return list.shift();
+            let nearest = null;
+            let nearestDist = Number.POSITIVE_INFINITY;
+            all.forEach((candidate) => {
+              const ds = Number(candidate.speed) - Number(p?.speed);
+              const da = Number(candidate.accel) - Number(p?.accel);
+              const dist = ds * ds + da * da;
+              if (dist < nearestDist) {
+                nearestDist = dist;
+                nearest = candidate;
+              }
+            });
+            return nearest;
+          })
+          .filter(Boolean);
+      }
+      const asCustomData = (point, kind) => [
+        item.name,
+        Number.isInteger(point.index) ? point.index : -1,
+        Number.isFinite(Number(point.time)) ? Number(point.time) : null,
+        Number(point.speed),
+        Number(point.accel),
+        kind,
+      ];
 
       allTraces.push(
         {
@@ -43,6 +98,7 @@ export default function AspChart({
           mode: "markers",
           x: rejected.map((p) => p.speed),
           y: rejected.map((p) => p.accel),
+          customdata: rejected.map((p) => asCustomData(p, "rejected")),
           marker: { size: 4, color: base ? hexToRgba(base, 0.2) : undefined },
           showlegend: true,
         },
@@ -52,6 +108,7 @@ export default function AspChart({
           mode: "markers",
           x: included.map((p) => p.speed),
           y: included.map((p) => p.accel),
+          customdata: included.map((p) => asCustomData(p, "included")),
           marker: { size: 4, color: base ? hexToRgba(base, 0.4) : undefined },
           showlegend: true,
         },
@@ -61,6 +118,7 @@ export default function AspChart({
           mode: "markers",
           x: selected.map((p) => p.speed),
           y: selected.map((p) => p.accel),
+          customdata: selected.map((p) => asCustomData(p, "points")),
           marker: { size: 7, color: base ? hexToRgba(base, 0.9) : undefined },
           showlegend: true,
         },
@@ -99,6 +157,53 @@ export default function AspChart({
           showlegend: true,
         });
       }
+
+      const selectedForFile = (selectedPoints || []).filter(
+        (p) => p?.name === item.name && Number.isInteger(Number(p?.index)),
+      );
+      if (selectedForFile.length > 0 && all.length > 0) {
+        const byIndex = [...all].sort((a, b) => a.index - b.index);
+        selectedForFile.forEach((sel) => {
+          const selectedIndex = Number(sel.index);
+          const rangeFrom = selectedIndex - pointWindow;
+          const rangeTo = selectedIndex + pointWindow;
+          const windowPoints = byIndex.filter((p) => p.index >= rangeFrom && p.index <= rangeTo);
+          if (windowPoints.length > 1) {
+            allTraces.push({
+              name: `${item.name} context`,
+              type: "scatter",
+              mode: "lines+markers",
+              x: windowPoints.map((p) => p.speed),
+              y: windowPoints.map((p) => p.accel),
+              line: {
+                color: base || "#000123",
+                width: 3,
+              },
+              marker: {
+                size: 8,
+                color: base || "#000123",
+              },
+              showlegend: false,
+            });
+          }
+          const center = byIndex.find((p) => p.index === selectedIndex);
+          if (center) {
+            allTraces.push({
+              name: `${item.name} selected`,
+              type: "scatter",
+              mode: "markers",
+              x: [center.speed],
+              y: [center.accel],
+              marker: {
+                size: 12,
+                color: base || "#000123",
+                line: { color: "#ffffff", width: 2 },
+              },
+              showlegend: false,
+            });
+          }
+        });
+      }
     });
 
     return {
@@ -107,7 +212,7 @@ export default function AspChart({
       minSpeed: Number.isFinite(globalMinSpeed) ? globalMinSpeed : 0,
       maxSpeed: Number.isFinite(globalMaxSpeed) ? globalMaxSpeed : 0,
     };
-  }, [profiles, colorMap, defaultColor, hiddenMap]);
+  }, [profiles, colorMap, defaultColor, hiddenMap, selectedPoints, pointWindow]);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;
@@ -146,13 +251,31 @@ export default function AspChart({
       displayModeBar: true,
     };
     Plotly.react(node, data.traces, layout, config);
+    const onClick = (event) => {
+      if (!onPointSelect) return;
+      const hit = event?.points?.[0];
+      const custom = hit?.customdata;
+      if (!Array.isArray(custom) || custom.length < 5) return;
+      onPointSelect({
+        name: custom[0],
+        index: Number(custom[1]),
+        time: custom[2] === null ? null : Number(custom[2]),
+        speed: Number(custom[3]),
+        accel: Number(custom[4]),
+        kind: custom[5] || "point",
+      });
+    };
+    node.on("plotly_click", onClick);
 
     const ro = new ResizeObserver(() => Plotly.Plots.resize(node));
     ro.observe(node);
     return () => {
+      if (typeof node.removeListener === "function") {
+        node.removeListener("plotly_click", onClick);
+      }
       ro.disconnect();
     };
-  }, [data, title]);
+  }, [data, title, onPointSelect]);
 
   return <div className={styles.chart} ref={containerRef} />;
 }

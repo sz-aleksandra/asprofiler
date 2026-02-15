@@ -137,9 +137,9 @@
 
 .statsCard {
   border: none;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
+  border-radius: 16px;
+  background: white;
+  padding: 8px;
 }
 
 .statsRow {
@@ -173,4 +173,138 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 28px;
+}
+
+.selectionSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.selectionToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--black);
+}
+
+.selectionToolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.selectionTable {
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.selectionRow {
+  grid-template-columns: 44px 1fr 120px 120px 120px 120px;
+  gap: 10px;
+}
+
+.selectionHead {
+  font-weight: 600;
+}
+
+.selectionSummary {
+  min-width: 160px;
+  color: var(--black);
+  font-size: 12px;
+}
+
+.selectionControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.selectionLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--black);
+  font-size: 13px;
+}
+
+.selectionInput {
+  width: 80px;
+  padding: 6px 8px;
+  border: 1px solid var(--black);
+  border-radius: 6px;
+}
+
+.selectionCellCheckbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.selectionFile {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectionCol {
+  text-align: right;
+  color: var(--black);
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.selectionActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.selectionDangerBtn {
+  background: var(--red);
+  color: var(--white);
+  border: 1px solid var(--white);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.selectionDangerBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.selectionDangerBtn:hover {
+  background: red;
+  color: white;
+  border: 1px solid white;
+}
+
+.selectionRemoveBtn {
+  background: var(--red);
+  color: var(--white);
+  border: 1px solid var(--white);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.selectionRemoveBtn:hover {
+  background: red;
+  color: white;
+  border: 1px solid white;
+}
+
+.selectionEmpty {
+  padding: 12px 14px;
+  color: var(--black);
+  background: transparent;
 }
