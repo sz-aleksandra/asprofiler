@@ -9,3 +9,119 @@
   font-size: 24px;
   color: var(--black);
 }
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--black);
+  align-items: center;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.selectAll {
+  display: flex;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--black);
+}
+
+.count {
+  color: var(--black);
+  font-size: 12px;
+}
+
+.dangerBtn {
+  background: var(--red);
+  color: var(--white);
+  border: 1px solid var(--white);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dangerBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dangerBtn:hover {
+  background: red;
+  color: white;
+  border: 1px solid white;
+}
+
+.linkDanger {
+  background: var(--red);
+  color: var(--white);
+  border: 1px solid var(--white);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkDanger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.linkDanger:hover {
+  background: red;
+  color: white;
+  border: 1px solid white;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 44px 1fr 120px 120px;
+  padding: 12px 14px;
+  align-items: center;
+  border-bottom: 1px solid var(--black);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.head {
+  font-weight: 600;
+  color: var(--black);
+}
+
+.cellCheckbox {
+  display: flex;
+  justify-content: center;
+}
+
+.cellName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellSize {
+  text-align: right;
+  color: var(--black);
+  font-variant-numeric: tabular-nums;
+}
+
+.cellActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.table {
+  border: none;
+}
+
+.empty {
+  color: var(--black);
+  padding: 12px 14px;
+}

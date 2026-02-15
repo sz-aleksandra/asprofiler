@@ -6,6 +6,7 @@ from pathlib import Path
 TIME_COL = "Time"
 SPEED_COL = "Speed (m/s)"
 ACCEL_COL = "Instantaneous Acceleration Impulse"
+HEART_COL = "Heart Rate (bpm)"
 
 
 def parse_time_to_seconds(value: str) -> float:
@@ -21,16 +22,13 @@ def parse_time_to_seconds(value: str) -> float:
     return h * 3600 + m * 60 + s
 
 
-def downsample_csv(
-    input_path: Path, output_path: Path, bin_seconds: float, dedupe: bool
-) -> dict:
-    seen_bins = set()
+def downsample_csv(input_path: Path, output_path: Path) -> dict:
     seen_rows = set()
     total_rows = 0
     kept_rows = 0
     skipped_dupes = 0
-    skipped_bins = 0
     bad_rows = 0
+    first_time_sec = None
 
     with (
         input_path.open("r", encoding="utf-8-sig", newline="") as src,
@@ -38,7 +36,7 @@ def downsample_csv(
     ):
         reader = csv.DictReader(src)
         writer = csv.writer(dst)
-        writer.writerow(["time", "speed", "acceleration"])
+        writer.writerow(["time", "speed", "acceleration", "heartrate"])
 
         for row in reader:
             total_rows += 1
@@ -46,53 +44,54 @@ def downsample_csv(
                 t_raw = row.get(TIME_COL, "")
                 s_raw = row.get(SPEED_COL, "")
                 a_raw = row.get(ACCEL_COL, "")
+                h_raw = row.get(HEART_COL, "")
                 t = str(t_raw).strip()
                 s = float(str(s_raw).strip())
                 a = float(str(a_raw).strip())
                 if math.isnan(s) or math.isnan(a):
                     raise ValueError("nan")
                 t_sec = parse_time_to_seconds(t)
+                if first_time_sec is None:
+                    first_time_sec = t_sec
+                t_rel_sec = t_sec - first_time_sec
             except Exception:
                 bad_rows += 1
                 continue
 
-            bin_id = int(t_sec // bin_seconds)
-            if bin_id in seen_bins:
-                skipped_bins += 1
+            key = (f"{t_rel_sec:.3f}", s, a, str(h_raw).strip())
+            if key in seen_rows:
+                skipped_dupes += 1
                 continue
-            seen_bins.add(bin_id)
+            seen_rows.add(key)
 
-            if dedupe:
-                key = (t, s, a)
-                if key in seen_rows:
-                    skipped_dupes += 1
-                    continue
-                seen_rows.add(key)
+            hr = ""
+            try:
+                if h_raw is not None and str(h_raw).strip() != "":
+                    hr = f"{float(str(h_raw).strip()):.2f}"
+            except Exception:
+                hr = ""
 
-            writer.writerow([t, f"{s:.6f}", f"{a:.6f}"])
+            writer.writerow([f"{t_rel_sec:.3f}", f"{s:.6f}", f"{a:.6f}", hr])
             kept_rows += 1
 
     return {
         "total_rows": total_rows,
         "kept_rows": kept_rows,
         "bad_rows": bad_rows,
-        "skipped_bins": skipped_bins,
         "skipped_dupes": skipped_dupes,
     }
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Downsample GPS CSV to time/speed/accel")
+    ap = argparse.ArgumentParser(
+        description="Normalize GPS CSV to time/speed/accel/heartrate and dedupe rows"
+    )
     ap.add_argument("input", help="Input CSV path")
     ap.add_argument(
         "-o",
         "--output",
         help="Output CSV path (default: <input>_downsampled.csv)",
     )
-    ap.add_argument(
-        "--bin", type=float, default=0.1, help="Time bin size in seconds (default: 0.1)"
-    )
-    ap.add_argument("--no-dedupe", action="store_true", help="Disable deduplication")
     args = ap.parse_args()
 
     input_path = Path(args.input)
@@ -105,14 +104,13 @@ def main():
         else input_path.with_name(f"{input_path.stem}_downsampled.csv")
     )
 
-    stats = downsample_csv(input_path, output_path, args.bin, dedupe=not args.no_dedupe)
+    stats = downsample_csv(input_path, output_path)
     print("Wrote:", output_path)
     print(
         "Rows:",
         f"total={stats['total_rows']}",
         f"kept={stats['kept_rows']}",
         f"bad={stats['bad_rows']}",
-        f"skipped_bins={stats['skipped_bins']}",
         f"skipped_dupes={stats['skipped_dupes']}",
     )
 

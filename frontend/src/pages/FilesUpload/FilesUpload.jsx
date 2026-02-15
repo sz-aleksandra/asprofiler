@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 
 import Dropzone from "../../components/Dropzone/Dropzone";
-import FilesTable from "../../components/FilesTable/FilesTable";
 import Toast from "../../components/Toast/Toast";
 
 import { deleteFile, deleteFiles, listFiles, uploadFiles } from "../../services/filesApi";
+import { formatBytes } from "../../utils/formatBytes";
 
 import styles from "./FilesUpload.module.css";
 
@@ -90,6 +90,11 @@ export default function FilesUpload() {
   const sortedFiles = useMemo(() => {
     return [...files].sort((a, b) => a.name.localeCompare(b.name));
   }, [files]);
+  const allSelected = useMemo(() => {
+    if (!sortedFiles.length) return false;
+    return sortedFiles.every((f) => selected.has(f.name));
+  }, [sortedFiles, selected]);
+  const anySelected = selected.size > 0;
 
   return (
     <section className={styles.page}>
@@ -97,15 +102,74 @@ export default function FilesUpload() {
 
       <Dropzone onFiles={onFiles} />
 
-      <FilesTable
-        files={sortedFiles}
-        selected={selected}
-        onToggleOne={onToggleOne}
-        onToggleAll={onToggleAll}
-        onDeleteOne={onDeleteOne}
-        onDeleteSelected={onDeleteSelected}
-        busy={busy}
-      />
+      <section className={styles.card}>
+        <div className={styles.toolbar}>
+          <div className={styles.left}>
+            <label className={styles.selectAll}>
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={() => onToggleAll(!allSelected)}
+                disabled={!sortedFiles.length || busy}
+              />
+              <span>Select all</span>
+            </label>
+            <span className={styles.count}>
+              {sortedFiles.length} files · {selected.size} selected
+            </span>
+          </div>
+
+          <button
+            className={styles.dangerBtn}
+            onClick={onDeleteSelected}
+            disabled={!anySelected || busy}
+            type="button"
+          >
+            Delete selected
+          </button>
+        </div>
+
+        <div className={styles.table}>
+          <div className={`${styles.row} ${styles.head}`}>
+            <div className={styles.cellCheckbox}></div>
+            <div className={styles.cellName}>Filename</div>
+            <div className={styles.cellSize}>Size</div>
+            <div className={styles.cellActions}></div>
+          </div>
+
+          {sortedFiles.map((f) => {
+            const checked = selected.has(f.name);
+            return (
+              <div className={styles.row} key={f.name}>
+                <div className={styles.cellCheckbox}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => onToggleOne(f.name)}
+                    disabled={busy}
+                  />
+                </div>
+
+                <div className={styles.cellName}>{f.name}</div>
+                <div className={styles.cellSize}>{formatBytes(f.size)}</div>
+
+                <div className={styles.cellActions}>
+                  <button
+                    className={styles.linkDanger}
+                    onClick={() => onDeleteOne(f.name)}
+                    disabled={busy}
+                    type="button"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {!sortedFiles.length && <div className={styles.empty}>No files available.</div>}
+        </div>
+      </section>
 
       <Toast message={toast.message} type={toast.type} onClose={closeToast} />
     </section>

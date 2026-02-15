@@ -64,14 +64,14 @@ def analyze(req: AnalyzeRequest):
         if not path.exists():
             results.append({"name": safe, "error": "not_found"})
             continue
-        speeds, accels, total_rows = load_series(path)
+        times, speeds, accels, hearts, total_rows = load_series(path)
         try:
             logger.info(
                 "analyze %s rows=%d",
                 safe,
                 total_rows,
             )
-            profile = build_as_profile(speeds, accels, params, total_rows)
+            profile = build_as_profile(times, speeds, accels, hearts, params, total_rows)
             results.append({"name": safe, "profile": profile})
         except HTTPException as e:
             results.append({"name": safe, "error": str(e.detail)})

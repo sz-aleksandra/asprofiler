@@ -47,3 +47,9 @@
   border: solid 1px var(--black);
   color: var(--black);
 }
+
+.active:hover {
+  background: white;
+  border: solid 1px black;
+  color: black;
+}

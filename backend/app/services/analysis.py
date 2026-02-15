@@ -8,9 +8,12 @@ from fastapi import HTTPException
 from app.models import AnalyzeParams
 
 
-def load_series(path: Path) -> tuple[np.ndarray, np.ndarray, int]:
+def load_series(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None, int]:
     speeds = []
     accels = []
+    times = []
+    hearts = []
+    has_heart = False
     total_rows = 0
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
@@ -29,29 +32,44 @@ def load_series(path: Path) -> tuple[np.ndarray, np.ndarray, int]:
         time_col = field_map["time"]
         speed_col = field_map["speed"]
         accel_col = field_map["acceleration"]
+        heart_col = field_map.get("heartrate")
         for row in reader:
             total_rows += 1
             try:
                 t_raw = row.get(time_col, "")
                 s_raw = row.get(speed_col, "")
                 a_raw = row.get(accel_col, "")
-                if s_raw is None or a_raw is None:
+                if t_raw is None or s_raw is None or a_raw is None:
                     continue
+                t = float(str(t_raw).strip())
                 s = float(str(s_raw).strip())
                 a = float(str(a_raw).strip())
             except (ValueError, TypeError):
                 continue
-            if math.isnan(s) or math.isnan(a):
+            if math.isnan(t) or math.isnan(s) or math.isnan(a):
                 continue
             speeds.append(s)
             accels.append(a)
+            times.append(t)
+            if heart_col:
+                h_raw = row.get(heart_col, "")
+                try:
+                    if h_raw is None or str(h_raw).strip() == "":
+                        hearts.append(float("nan"))
+                    else:
+                        hearts.append(float(str(h_raw).strip()))
+                        has_heart = True
+                except (ValueError, TypeError):
+                    hearts.append(float("nan"))
 
     if not speeds:
         raise HTTPException(status_code=400, detail="No valid speed/accel rows found")
 
     return (
+        np.array(times, dtype=float),
         np.array(speeds, dtype=float),
         np.array(accels, dtype=float),
+        np.array(hearts, dtype=float) if has_heart else None,
         total_rows,
     )
 
@@ -137,9 +155,20 @@ def _apply_ci_filter(
     return x[keep], y[keep]
 
 
+def _stats(arr: np.ndarray) -> dict:
+    return {
+        "min": float(np.min(arr)),
+        "mean": float(np.mean(arr)),
+        "median": float(np.median(arr)),
+        "max": float(np.max(arr)),
+    }
+
+
 def build_as_profile(
+    times: np.ndarray,
     speeds: np.ndarray,
     accels: np.ndarray,
+    hearts: np.ndarray | None,
     params: AnalyzeParams,
     total_rows: int,
 ):
@@ -178,6 +207,9 @@ def build_as_profile(
     r2 = _r2(y, y_hat)
 
     s0 = float(-intercept / slope) if slope != 0 else float("inf")
+    heart_arr = None
+    if hearts is not None:
+        heart_arr = hearts[~np.isnan(hearts)]
     return {
         "all_points": [
             {"speed": float(xs), "accel": float(ys)}
@@ -196,6 +228,17 @@ def build_as_profile(
             "AS_slope": float(slope),
             "S0": s0,
             "r2": float(r2),
+        },
+        "timeseries": {
+            "time": times.tolist(),
+            "speed": speeds.tolist(),
+            "acceleration": accels.tolist(),
+            "heartrate": hearts.tolist() if hearts is not None else None,
+        },
+        "stats": {
+            "speed": _stats(speeds),
+            "acceleration": _stats(accels),
+            "heartrate": _stats(heart_arr) if heart_arr is not None and len(heart_arr) else None,
         },
         "meta": {
             "n_all_points": int(len(all_s)),
