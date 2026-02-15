@@ -11,10 +11,13 @@ export default function AspChart({
   defaultColor,
   hiddenMap,
   onPointSelect,
+  onPointsSelect,
   selectedPoints,
   pointWindow,
 }) {
   const containerRef = useRef(null);
+  const cssBlack =
+    getComputedStyle(document.documentElement).getPropertyValue("--black").trim() || "#000123";
 
   const data = useMemo(() => {
     const valid = (profiles || [])
@@ -197,7 +200,6 @@ export default function AspChart({
               marker: {
                 size: 12,
                 color: base || "#000123",
-                line: { color: "#ffffff", width: 2 },
               },
               showlegend: false,
             });
@@ -218,9 +220,6 @@ export default function AspChart({
     if (!containerRef.current) return undefined;
     const node = containerRef.current;
     if (!data) return undefined;
-    const cssBlack =
-      getComputedStyle(document.documentElement).getPropertyValue("--black").trim() || "#000123";
-
     const layout = {
       title: { text: title, font: { color: cssBlack } },
       font: { color: cssBlack },
@@ -265,17 +264,36 @@ export default function AspChart({
         kind: custom[5] || "point",
       });
     };
+    const onSelected = (event) => {
+      if (!onPointsSelect) return;
+      const hits = Array.isArray(event?.points) ? event.points : [];
+      if (!hits.length) return;
+      const points = hits
+        .map((h) => h?.customdata)
+        .filter((c) => Array.isArray(c) && c.length >= 5)
+        .map((c) => ({
+          name: c[0],
+          index: Number(c[1]),
+          time: c[2] === null ? null : Number(c[2]),
+          speed: Number(c[3]),
+          accel: Number(c[4]),
+          kind: c[5] || "point",
+        }));
+      if (points.length) onPointsSelect(points);
+    };
     node.on("plotly_click", onClick);
+    node.on("plotly_selected", onSelected);
 
     const ro = new ResizeObserver(() => Plotly.Plots.resize(node));
     ro.observe(node);
     return () => {
       if (typeof node.removeListener === "function") {
         node.removeListener("plotly_click", onClick);
+        node.removeListener("plotly_selected", onSelected);
       }
       ro.disconnect();
     };
-  }, [data, title, onPointSelect]);
+  }, [data, title, onPointSelect, onPointsSelect]);
 
   return <div className={styles.chart} ref={containerRef} />;
 }

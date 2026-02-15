@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import Plotly from "plotly.js-dist-min";
 
 import styles from "./TimeSeriesChart.module.css";
+import { hexToRgba } from "../../utils/hexToRgba";
 
 export default function TimeSeriesChart({
   title,
@@ -13,6 +14,8 @@ export default function TimeSeriesChart({
   timeWindowSec,
 }) {
   const containerRef = useRef(null);
+  const cssBlack =
+    getComputedStyle(document.documentElement).getPropertyValue("--black").trim() || "#000123";
 
   const plotData = useMemo(() => {
     if (!series?.length) return null;
@@ -60,7 +63,7 @@ export default function TimeSeriesChart({
               x1: windowTo,
               y0: 0,
               y1: 1,
-              fillcolor: "rgba(0, 1, 35, 0.08)",
+              fillcolor: hexToRgba(cssBlack, 0.05),
               line: { width: 0 },
               layer: "below",
             },
@@ -72,7 +75,7 @@ export default function TimeSeriesChart({
               x1: centerTime,
               y0: 0,
               y1: 1,
-              line: { color: "rgba(0, 1, 35, 0.65)", width: 2 },
+              line: { color: hexToRgba(cssBlack, 0.5), width: 2 },
             },
           );
         }
@@ -102,7 +105,6 @@ export default function TimeSeriesChart({
           marker: {
             size: 11,
             color: target?.color || "#000123",
-            line: { color: "#ffffff", width: 2 },
           },
           showlegend: false,
         });
@@ -110,15 +112,12 @@ export default function TimeSeriesChart({
     }
 
     return { traces: next, shapes };
-  }, [time, series, selectedPoints, pointWindow, timeWindowSec]);
+  }, [time, series, selectedPoints, pointWindow, timeWindowSec, cssBlack]);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;
     const node = containerRef.current;
     if (!plotData) return undefined;
-    const cssBlack =
-      getComputedStyle(document.documentElement).getPropertyValue("--black").trim() || "#000123";
-
     const layout = {
       title: { text: title, font: { color: cssBlack } },
       font: { color: cssBlack },

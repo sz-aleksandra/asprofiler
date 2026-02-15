@@ -56,27 +56,6 @@
   background: white;
 }
 
-.secondaryBtn {
-  padding: 8px 14px;
-  border-radius: 6px;
-  border: 1px solid var(--red);
-  background: var(--white);
-  color: var(--red);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.secondaryBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.secondaryBtn:hover {
-  background: white;
-  color: red;
-  border: 1px solid red;
-}
-
 .table {
   border: none;
   border-radius: 0;
@@ -200,7 +179,8 @@
 .selectionTable {
   border: none;
   border-radius: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  max-height: 600px;
 }
 
 .selectionRow {
@@ -210,6 +190,19 @@
 
 .selectionHead {
   font-weight: 600;
+}
+
+.selectionSortBtn {
+  border: none;
+  color: var(--black);
+  font: inherit;
+  text-align: right;
+  cursor: pointer;
+  padding: 0;
+}
+
+.selectionSortFileBtn {
+  text-align: left;
 }
 
 .selectionSummary {

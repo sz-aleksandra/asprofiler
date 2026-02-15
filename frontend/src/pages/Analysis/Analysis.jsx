@@ -37,46 +37,55 @@ export default function Analysis() {
     }
   });
   const defaultColor = localStorage.getItem("analysis_default_color") || "#000000";
-  const [hiddenMap, setHiddenMap] = useState(() => {
-    const raw = localStorage.getItem("analysis_hidden_map");
-    if (!raw) return {};
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return {};
-    }
-  });
-
-  useEffect(() => {
-    localStorage.setItem("analysis_hidden_map", JSON.stringify(hiddenMap));
-  }, [hiddenMap]);
-  const [selectedPoints, setSelectedPoints] = useState(() => {
-    const raw = localStorage.getItem("analysis_selected_points");
-    if (!raw) return [];
-    try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      return parsed.filter(
-        (p) => p?.name && Number.isInteger(Number(p?.index)) && Number.isFinite(Number(p?.time)),
-      );
-    } catch {
-      return [];
-    }
-  });
-  const [disabledPointMap, setDisabledPointMap] = useState({});
+  const [hiddenMap, setHiddenMap] = useState({});
+  const [selectedPoints, setSelectedPoints] = useState([]);
+  const [markedPointMap, setMarkedPointMap] = useState({});
   const [pointWindow, setPointWindow] = useState(10);
   const [timeWindowSec, setTimeWindowSec] = useState(10);
+  const [pointsSortRules, setPointsSortRules] = useState([]);
   const visibleResults = results.filter((r) => !hiddenMap[r.name]);
   const pointKey = (p) => `${p.name}::${p.index}`;
-  const activeSelectedPoints = selectedPoints.filter((p) => !disabledPointMap[pointKey(p)]);
   const visibleFileNames = new Set(visibleResults.map((r) => r.name));
   const visibleSelectedPoints = selectedPoints.filter((p) => visibleFileNames.has(p.name));
-  const activeVisibleSelectedPoints = activeSelectedPoints.filter((p) =>
-    visibleFileNames.has(p.name),
-  );
-  useEffect(() => {
-    localStorage.setItem("analysis_selected_points", JSON.stringify(selectedPoints));
-  }, [selectedPoints]);
+  const selectedVisibleCount = visibleSelectedPoints.filter((p) => markedPointMap[pointKey(p)]).length;
+  const filteredSelectedPoints = useMemo(() => {
+    const sorted = [...visibleSelectedPoints];
+    if (!pointsSortRules.length) return sorted;
+
+    sorted.sort((a, b) => {
+      for (const rule of pointsSortRules) {
+        let cmp = 0;
+        if (rule.key === "name") cmp = String(a.name).localeCompare(String(b.name));
+        if (rule.key === "time") cmp = Number(a.time) - Number(b.time);
+        if (rule.key === "speed") cmp = Number(a.speed) - Number(b.speed);
+        if (rule.key === "accel") cmp = Number(a.accel) - Number(b.accel);
+        if (cmp !== 0) return rule.dir === "asc" ? cmp : -cmp;
+      }
+      return 0;
+    });
+    return sorted;
+  }, [visibleSelectedPoints, pointsSortRules]);
+
+  const toggleSortRule = (key) => {
+    setPointsSortRules((prev) => {
+      const idx = prev.findIndex((r) => r.key === key);
+      if (idx === -1) return [...prev, { key, dir: "asc" }];
+      const current = prev[idx];
+      if (current.dir === "asc") {
+        const next = [...prev];
+        next[idx] = { ...current, dir: "desc" };
+        return next;
+      }
+      return prev.filter((r) => r.key !== key);
+    });
+  };
+
+  const sortBadge = (key) => {
+    const idx = pointsSortRules.findIndex((r) => r.key === key);
+    if (idx === -1) return "";
+    const dir = pointsSortRules[idx].dir === "asc" ? "↑" : "↓";
+    return ` ${dir}(${idx + 1})`;
+  };
 
   const combinedTimeseries = useMemo(() => {
     const speedSeries = [];
@@ -138,24 +147,47 @@ export default function Analysis() {
   const allShown = results.length > 0 && results.every((r) => !hiddenMap[r.name]);
   const shownCount = results.filter((r) => !hiddenMap[r.name]).length;
   const onAspPointSelect = (point) => {
-    if (!point || !Number.isInteger(Number(point.index))) return;
-    const key = `${point.name}::${Number(point.index)}`;
+    const idx = Number(point?.index);
+    const t = Number(point?.time);
+    if (!point?.name || !Number.isInteger(idx) || idx < 0 || !Number.isFinite(t)) return;
+    const key = `${point.name}::${idx}`;
     setSelectedPoints((prev) => {
       const exists = prev.some((p) => `${p.name}::${p.index}` === key);
       if (exists) {
-        setDisabledPointMap((map) => {
+        setMarkedPointMap((map) => {
           const next = { ...map };
           delete next[key];
           return next;
         });
         return prev.filter((p) => `${p.name}::${p.index}` !== key);
       }
-      return [...prev, { ...point, index: Number(point.index) }];
+      return [...prev, { ...point, index: idx, time: t }];
     });
   };
-  const allPointsActive =
+  const onAspPointsSelect = (points) => {
+    if (!Array.isArray(points) || !points.length) return;
+    setSelectedPoints((prev) => {
+      const existing = new Set(prev.map((p) => `${p.name}::${p.index}`));
+      const additions = points
+        .map((point) => {
+          const idx = Number(point?.index);
+          const t = Number(point?.time);
+          if (!point?.name || !Number.isInteger(idx) || idx < 0 || !Number.isFinite(t)) {
+            return null;
+          }
+          const key = `${point.name}::${idx}`;
+          if (existing.has(key)) return null;
+          existing.add(key);
+          return { ...point, index: idx, time: t };
+        })
+        .filter(Boolean);
+      if (!additions.length) return prev;
+      return [...prev, ...additions];
+    });
+  };
+  const allPointsMarked =
     visibleSelectedPoints.length > 0 &&
-    visibleSelectedPoints.every((p) => !disabledPointMap[pointKey(p)]);
+    visibleSelectedPoints.every((p) => Boolean(markedPointMap[pointKey(p)]));
 
   if (analysis.length === 0) {
     return (
@@ -195,19 +227,6 @@ export default function Analysis() {
               {results.length} files · {shownCount} shown
             </span>
           </div>
-          <button
-            className={styles.secondaryBtn}
-            type="button"
-            onClick={() => {
-              const next = {};
-              results.forEach((r) => {
-                next[r.name] = true;
-              });
-              setHiddenMap(next);
-            }}
-          >
-            Hide all
-          </button>
         </div>
         <div className={styles.table}>
           <div className={`${styles.row} ${styles.head}`}>
@@ -255,141 +274,180 @@ export default function Analysis() {
           colorMap={colors}
           defaultColor={defaultColor}
           onPointSelect={onAspPointSelect}
-          selectedPoints={activeVisibleSelectedPoints}
+          onPointsSelect={onAspPointsSelect}
+          selectedPoints={visibleSelectedPoints}
           pointWindow={pointWindow}
         />
       )}
-      <div className={styles.selectionSection}>
-        <div className={styles.selectionToolbar}>
-          <div className={styles.selectionToolbarLeft}>
-            <label className={styles.selectAll}>
-              <input
-                type="checkbox"
-                checked={allPointsActive}
-                disabled={!visibleSelectedPoints.length}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setDisabledPointMap((prev) => {
+      {visibleResults.length > 0 && (
+        <div className={styles.selectionSection}>
+          <div className={styles.selectionToolbar}>
+            <div className={styles.selectionToolbarLeft}>
+              <label className={styles.selectAll}>
+                <input
+                  type="checkbox"
+                  checked={allPointsMarked}
+                  disabled={!visibleSelectedPoints.length}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setMarkedPointMap((prev) => {
+                        const next = { ...prev };
+                        visibleSelectedPoints.forEach((p) => {
+                          next[pointKey(p)] = true;
+                        });
+                        return next;
+                      });
+                      return;
+                    }
+                    setMarkedPointMap((prev) => {
                       const next = { ...prev };
                       visibleSelectedPoints.forEach((p) => {
                         delete next[pointKey(p)];
                       });
                       return next;
                     });
-                    return;
-                  }
-                  setDisabledPointMap((prev) => {
+                  }}
+                />
+                <span>Select all</span>
+              </label>
+            <div className={styles.selectionSummary}>
+              {visibleSelectedPoints.length} points · {selectedVisibleCount} selected
+            </div>
+          </div>
+            <div className={styles.selectionControls}>
+              <label className={styles.selectionLabel}>
+                +/- points
+                <input
+                  className={styles.selectionInput}
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={pointWindow}
+                  onChange={(e) => setPointWindow(Math.max(0, Number(e.target.value) || 0))}
+                />
+              </label>
+              <label className={styles.selectionLabel}>
+                +/- seconds
+                <input
+                  className={styles.selectionInput}
+                  type="number"
+                  min={0}
+                  step={0.1}
+                  value={timeWindowSec}
+                  onChange={(e) => setTimeWindowSec(Math.max(0, Number(e.target.value) || 0))}
+                />
+              </label>
+              <button
+                className={styles.selectionDangerBtn}
+                type="button"
+                disabled={!selectedVisibleCount}
+                onClick={() => {
+                  const removeKeys = new Set(
+                    visibleSelectedPoints
+                      .filter((p) => markedPointMap[pointKey(p)])
+                      .map(pointKey),
+                  );
+                  setSelectedPoints((prev) => prev.filter((p) => !removeKeys.has(pointKey(p))));
+                  setMarkedPointMap((prev) => {
                     const next = { ...prev };
+                    removeKeys.forEach((k) => {
+                      delete next[k];
+                    });
                     visibleSelectedPoints.forEach((p) => {
-                      next[pointKey(p)] = true;
+                      delete next[pointKey(p)];
                     });
                     return next;
                   });
                 }}
-              />
-              <span>Select all</span>
-            </label>
-            <div className={styles.selectionSummary}>
-              {visibleSelectedPoints.length} points · {activeVisibleSelectedPoints.length} active
+              >
+                Remove selected
+              </button>
             </div>
           </div>
-          <div className={styles.selectionControls}>
-            <label className={styles.selectionLabel}>
-              +/- points
-              <input
-                className={styles.selectionInput}
-                type="number"
-                min={1}
-                step={1}
-                value={pointWindow}
-                onChange={(e) => setPointWindow(Math.max(1, Number(e.target.value) || 1))}
-              />
-            </label>
-            <label className={styles.selectionLabel}>
-              +/- seconds
-              <input
-                className={styles.selectionInput}
-                type="number"
-                min={1}
-                step={1}
-                value={timeWindowSec}
-                onChange={(e) => setTimeWindowSec(Math.max(1, Number(e.target.value) || 1))}
-              />
-            </label>
-            <button
-            className={styles.selectionDangerBtn}
-            type="button"
-            disabled={!visibleSelectedPoints.length}
-            onClick={() => {
-              const visibleKeys = new Set(visibleSelectedPoints.map(pointKey));
-              setSelectedPoints((prev) => prev.filter((p) => !visibleKeys.has(pointKey(p))));
-              setDisabledPointMap((prev) => {
-                const next = { ...prev };
-                visibleSelectedPoints.forEach((p) => {
-                  delete next[pointKey(p)];
-                });
-                return next;
-              });
-            }}
-          >
-            Clear selection
-          </button>
-        </div>
-        </div>
-        <div className={styles.selectionTable}>
-          <div className={`${styles.row} ${styles.head} ${styles.selectionRow} ${styles.selectionHead}`}>
-            <div className={styles.selectionCellCheckbox}></div>
-            <div className={styles.selectionFile}>Filename</div>
-            <div className={styles.selectionCol}>Time</div>
-            <div className={styles.selectionCol}>Speed</div>
-            <div className={styles.selectionCol}>Accel</div>
-            <div className={styles.selectionActions}></div>
-          </div>
-          {visibleSelectedPoints.length === 0 && (
-            <div className={styles.selectionEmpty}>No selected points.</div>
-          )}
-          {visibleSelectedPoints.map((p, i) => (
-            <div className={`${styles.row} ${styles.selectionRow}`} key={`${p.name}-${p.index}-${i}`}>
-              <div className={styles.selectionCellCheckbox}>
-                <input
-                  type="checkbox"
-                  checked={!disabledPointMap[pointKey(p)]}
-                  onChange={(e) => {
-                    const key = pointKey(p);
-                    setDisabledPointMap((prev) => {
-                      const next = { ...prev };
-                      if (e.target.checked) delete next[key];
-                      else next[key] = true;
-                      return next;
-                    });
-                  }}
-                />
-              </div>
-              <div className={styles.selectionFile}>{p.name}</div>
-              <div className={styles.selectionCol}>{fmt(p.time)}s</div>
-              <div className={styles.selectionCol}>{fmt(p.speed)}</div>
-              <div className={styles.selectionCol}>{fmt(p.accel)}</div>
-              <div className={styles.selectionActions}>
-                <button
-                  className={styles.selectionRemoveBtn}
-                  type="button"
-                  onClick={() => {
-                    const key = pointKey(p);
-                    setSelectedPoints((prev) => prev.filter((x) => pointKey(x) !== key));
-                    setDisabledPointMap((prev) => {
-                      const next = { ...prev };
-                      delete next[key];
-                      return next;
-                    });
-                  }}
-                >
-                  Remove
-                </button>
-              </div>
+          <div className={styles.selectionTable}>
+            <div
+              className={`${styles.row} ${styles.head} ${styles.selectionRow} ${styles.selectionHead}`}
+            >
+              <div className={styles.selectionCellCheckbox}></div>
+              <button
+                className={`${styles.selectionSortBtn} ${styles.selectionSortFileBtn}`}
+                type="button"
+                onClick={() => toggleSortRule("name")}
+              >
+                Filename{sortBadge("name") || " ↕"}
+              </button>
+              <button
+                className={styles.selectionSortBtn}
+                type="button"
+                onClick={() => toggleSortRule("time")}
+              >
+                Time{sortBadge("time") || " ↕"}
+              </button>
+              <button
+                className={styles.selectionSortBtn}
+                type="button"
+                onClick={() => toggleSortRule("speed")}
+              >
+                Speed{sortBadge("speed") || " ↕"}
+              </button>
+              <button
+                className={styles.selectionSortBtn}
+                type="button"
+                onClick={() => toggleSortRule("accel")}
+              >
+                Accel{sortBadge("accel") || " ↕"}
+              </button>
+              <div className={styles.selectionActions}></div>
             </div>
-          ))}
+            {filteredSelectedPoints.length === 0 && (
+              <div className={styles.selectionEmpty}>No selected points.</div>
+            )}
+            {filteredSelectedPoints.map((p, i) => (
+              <div
+                className={`${styles.row} ${styles.selectionRow}`}
+                key={`${p.name}-${p.index}-${i}`}
+              >
+                <div className={styles.selectionCellCheckbox}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(markedPointMap[pointKey(p)])}
+                    onChange={(e) => {
+                      const key = pointKey(p);
+                      setMarkedPointMap((prev) => {
+                        const next = { ...prev };
+                        if (e.target.checked) next[key] = true;
+                        else delete next[key];
+                        return next;
+                      });
+                    }}
+                  />
+                </div>
+                <div className={styles.selectionFile}>{p.name}</div>
+                <div className={styles.selectionCol}>{fmt(p.time)}s</div>
+                <div className={styles.selectionCol}>{fmt(p.speed)}</div>
+                <div className={styles.selectionCol}>{fmt(p.accel)}</div>
+                <div className={styles.selectionActions}>
+                  <button
+                    className={styles.selectionRemoveBtn}
+                    type="button"
+                    onClick={() => {
+                      const key = pointKey(p);
+                      setSelectedPoints((prev) => prev.filter((x) => pointKey(x) !== key));
+                      setMarkedPointMap((prev) => {
+                        const next = { ...prev };
+                        delete next[key];
+                        return next;
+                      });
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {visibleResults.length > 0 && (
         <section className={styles.fileSection}>
@@ -417,7 +475,7 @@ export default function Analysis() {
               title="Speed"
               series={combinedTimeseries.speedSeries}
               xTitle={xAxisTitle}
-              selectedPoints={activeVisibleSelectedPoints}
+              selectedPoints={visibleSelectedPoints}
               pointWindow={pointWindow}
               timeWindowSec={timeWindowSec}
             />
@@ -425,7 +483,7 @@ export default function Analysis() {
               title="Acceleration"
               series={combinedTimeseries.accelerationSeries}
               xTitle={xAxisTitle}
-              selectedPoints={activeVisibleSelectedPoints}
+              selectedPoints={visibleSelectedPoints}
               pointWindow={pointWindow}
               timeWindowSec={timeWindowSec}
             />
@@ -434,7 +492,7 @@ export default function Analysis() {
                 title="Heartrate"
                 series={combinedTimeseries.heartrateSeries}
                 xTitle={xAxisTitle}
-                selectedPoints={activeVisibleSelectedPoints}
+                selectedPoints={visibleSelectedPoints}
                 pointWindow={pointWindow}
                 timeWindowSec={timeWindowSec}
               />
