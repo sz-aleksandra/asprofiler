@@ -29,11 +29,12 @@
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
+  text-align: left;
 }
 
 .controlLabel {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto 1fr;
   gap: 6px;
   font-size: 13px;
   color: var(--black);
@@ -44,6 +45,7 @@
   padding: 6px 8px;
   border: 1px solid var(--black);
   border-radius: 8px;
+  align-self: center;
 }
 
 .colorInput {
@@ -52,7 +54,16 @@
   padding: 0;
   border: 1px solid var(--black);
   border-radius: 8px;
-  background: white;
+  align-self: center;
+}
+
+.colorInput::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.colorInput::-webkit-color-swatch {
+  border: none;
+  border-radius: 7px;
 }
 
 .inlineTable {
@@ -85,6 +96,8 @@
 }
 
 .count {
+  display: flex;
+  align-items: center;
   font-size: 12px;
   color: var(--black);
 }
@@ -142,7 +155,7 @@
 
 .cellSize {
   color: var(--black);
-  text-align: right;
+  text-align: left;
   font-variant-numeric: tabular-nums;
 }
 
@@ -182,6 +195,7 @@
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
+  text-align: left;
   padding: 10px 14px 14px 54px;
   border-bottom: 1px solid var(--black);
   background: transparent;

@@ -6,7 +6,7 @@ import { hexToRgba } from "../../utils/hexToRgba";
 
 export default function AspChart({
   profiles,
-  title = "ASP Chart",
+  title = "Acceleration Speed Profile",
   colorMap,
   defaultColor,
   hiddenMap,
@@ -166,12 +166,15 @@ export default function AspChart({
       );
       if (selectedForFile.length > 0 && all.length > 0) {
         const byIndex = [...all].sort((a, b) => a.index - b.index);
+        const selectedIndexSet = new Set(selectedForFile.map((p) => Number(p.index)));
+        const centers = [];
         selectedForFile.forEach((sel) => {
           const selectedIndex = Number(sel.index);
           const rangeFrom = selectedIndex - pointWindow;
           const rangeTo = selectedIndex + pointWindow;
           const windowPoints = byIndex.filter((p) => p.index >= rangeFrom && p.index <= rangeTo);
           if (windowPoints.length > 1) {
+            const markerSizes = windowPoints.map((p) => (selectedIndexSet.has(p.index) ? 0 : 4));
             allTraces.push({
               name: `${item.name} context`,
               type: "scatter",
@@ -180,31 +183,34 @@ export default function AspChart({
               y: windowPoints.map((p) => p.accel),
               line: {
                 color: base || "#000123",
-                width: 3,
+                width: 1.5,
               },
               marker: {
-                size: 8,
+                size: markerSizes,
                 color: base || "#000123",
               },
               showlegend: false,
             });
           }
           const center = byIndex.find((p) => p.index === selectedIndex);
-          if (center) {
-            allTraces.push({
-              name: `${item.name} selected`,
-              type: "scatter",
-              mode: "markers",
-              x: [center.speed],
-              y: [center.accel],
-              marker: {
-                size: 12,
-                color: base || "#000123",
-              },
-              showlegend: false,
-            });
-          }
+          if (center) centers.push(center);
         });
+        if (centers.length > 0) {
+          const ordered = [...centers].sort((a, b) => a.index - b.index);
+          allTraces.push({
+            name: `${item.name} selected`,
+            type: "scatter",
+            mode: "markers",
+            x: ordered.map((p) => p.speed),
+            y: ordered.map((p) => p.accel),
+            marker: {
+              size: 7,
+              color: base || "#000123",
+              symbol: "diamond",
+            },
+            showlegend: false,
+          });
+        }
       }
     });
 

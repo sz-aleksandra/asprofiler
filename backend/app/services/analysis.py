@@ -166,6 +166,12 @@ def _stats(arr: np.ndarray) -> dict:
     }
 
 
+def _curve_area(times: np.ndarray, values: np.ndarray) -> float:
+    if len(times) < 2 or len(values) < 2:
+        return 0.0
+    return float(np.trapz(values, x=times))
+
+
 def build_as_profile(
     times: np.ndarray,
     speeds: np.ndarray,
@@ -238,8 +244,14 @@ def build_as_profile(
             "heartrate": hearts.tolist() if hearts is not None else None,
         },
         "stats": {
-            "speed": _stats(speeds),
-            "acceleration": _stats(accels),
+            "speed": {
+                **_stats(speeds),
+                "area": _curve_area(times, speeds),
+            },
+            "acceleration": {
+                **_stats(accels),
+                "area": _curve_area(times, accels),
+            },
             "heartrate": _stats(heart_arr)
             if heart_arr is not None and len(heart_arr)
             else None,

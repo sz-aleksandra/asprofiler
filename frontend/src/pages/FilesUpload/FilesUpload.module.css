@@ -32,6 +32,8 @@
 }
 
 .count {
+  display: flex;
+  align-items: center;
   color: var(--black);
   font-size: 12px;
 }
@@ -108,7 +110,7 @@
 }
 
 .cellSize {
-  text-align: right;
+  text-align: left;
   color: var(--black);
   font-variant-numeric: tabular-nums;
 }

@@ -26,3 +26,7 @@ body,
 body {
   margin: 0;
 }
+
+input[type="checkbox"] {
+  accent-color: var(--red);
+}

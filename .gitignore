@@ -30,3 +30,5 @@ __pycache__/
 *.pyc
 .venv/
 backend/data/
+
+dont_forget.txt

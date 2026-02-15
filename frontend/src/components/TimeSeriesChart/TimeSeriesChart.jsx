@@ -12,6 +12,7 @@ export default function TimeSeriesChart({
   selectedPoints,
   pointWindow,
   timeWindowSec,
+  yReferenceLines = [],
 }) {
   const containerRef = useRef(null);
   const cssBlack =
@@ -25,13 +26,14 @@ export default function TimeSeriesChart({
         return x?.length && s.values?.length;
       })
       .map((s) => {
+        const baseColor = s.color || "#000123";
         return {
           name: s.name,
           type: "scattergl",
           mode: "lines",
           x: s.x || time,
           y: s.values,
-          line: { color: s.color || undefined, width: 1.5 },
+          line: { color: hexToRgba(baseColor, 0.4), width: 1.5 },
         };
       });
     if (!next.length) return null;
@@ -40,10 +42,14 @@ export default function TimeSeriesChart({
       (p) => p?.name && Number.isInteger(Number(p?.index)),
     );
     const shapes = [];
+    const selectedIndexBySeries = new Map();
     if (selections.length > 0) {
       selections.forEach((sel) => {
         const selectedName = sel.name;
         const selectedIndex = Number(sel.index);
+        const indexSet = selectedIndexBySeries.get(selectedName) || new Set();
+        indexSet.add(selectedIndex);
+        selectedIndexBySeries.set(selectedName, indexSet);
         const target = series.find((s) => s.name === selectedName);
         const xData = target?.x || time;
         const yData = target?.values;
@@ -85,14 +91,20 @@ export default function TimeSeriesChart({
         const xWindow = xData.slice(pFrom, pTo + 1);
         const yWindow = yData.slice(pFrom, pTo + 1);
         if (xWindow.length > 1) {
+          const selectedSet = selectedIndexBySeries.get(selectedName) || new Set();
+          const markerSizes = xWindow.map((_, i) => (selectedSet.has(pFrom + i) ? 0 : 7));
           next.push({
             name: `${selectedName} context`,
             type: "scatter",
             mode: "lines+markers",
             x: xWindow,
             y: yWindow,
-            line: { color: target?.color || "#000123", width: 3 },
-            marker: { size: 7, color: target?.color || "#000123" },
+            line: { color: target?.color || "#000123", width: 2 },
+            marker: {
+              size: markerSizes,
+              color: target?.color || "#000123",
+              line: { width: 0 },
+            },
             showlegend: false,
           });
         }
@@ -103,16 +115,35 @@ export default function TimeSeriesChart({
           x: [xData[selectedIndex]],
           y: [yData[selectedIndex]],
           marker: {
-            size: 11,
+            size: 7,
             color: target?.color || "#000123",
+            symbol: "diamond",
+            line: { width: 0 },
           },
           showlegend: false,
         });
       });
     }
 
-    return { traces: next, shapes };
-  }, [time, series, selectedPoints, pointWindow, timeWindowSec, cssBlack]);
+    const refShapes = (yReferenceLines || [])
+      .filter((line) => Number.isFinite(Number(line?.y)))
+      .map((line) => ({
+        type: "line",
+        xref: "paper",
+        yref: "y",
+        x0: 0,
+        x1: 1,
+        y0: Number(line.y),
+        y1: Number(line.y),
+        line: {
+          color: line.color || cssBlack,
+          width: Number.isFinite(Number(line.width)) ? Number(line.width) : 1.5,
+          dash: line.dash || "dash",
+        },
+      }));
+
+    return { traces: next, shapes: [...shapes, ...refShapes] };
+  }, [time, series, selectedPoints, pointWindow, timeWindowSec, cssBlack, yReferenceLines]);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;

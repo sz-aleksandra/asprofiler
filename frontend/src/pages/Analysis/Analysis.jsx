@@ -115,18 +115,31 @@ export default function Analysis() {
 
     return { speedSeries, accelerationSeries, heartrateSeries };
   }, [visibleResults, colors, defaultColor]);
+  const speedReferenceLines = useMemo(
+    () =>
+      visibleResults
+        .map((item) => ({
+          y: Number(item?.profile?.meta?.min_speed),
+          color: colors[item.name] || defaultColor,
+          width: 1.5,
+          dash: "dash",
+        }))
+        .filter((line) => Number.isFinite(line.y)),
+    [visibleResults, colors, defaultColor],
+  );
 
   const combinedStatsRows = useMemo(() => {
     const rows = [];
     visibleResults.forEach((item) => {
       const stats = item.profile?.stats || {};
-      rows.push({ label: `${item.name} Speed`, values: stats.speed });
+      rows.push({ label: `${item.name} Speed`, values: stats.speed, metric: "speed" });
     });
     visibleResults.forEach((item) => {
       const stats = item.profile?.stats || {};
       rows.push({
         label: `${item.name} Acceleration`,
         values: stats.acceleration,
+        metric: "acceleration",
       });
     });
     visibleResults.forEach((item) => {
@@ -135,6 +148,7 @@ export default function Analysis() {
         rows.push({
           label: `${item.name} Heartrate`,
           values: stats.heartrate,
+          metric: "heartrate",
         });
       }
     });
@@ -143,6 +157,16 @@ export default function Analysis() {
 
   const fmt = (v) =>
     v === undefined || v === null || Number.isNaN(v) ? "—" : Number(v).toFixed(3);
+  const fmtWithUnit = (v, unit) => {
+    if (v === undefined || v === null || Number.isNaN(v)) return "—";
+    return `${Number(v).toFixed(3)} ${unit}`;
+  };
+  const metricUnits = (metric) => {
+    if (metric === "speed") return { value: "m/s", area: "m" };
+    if (metric === "acceleration") return { value: "m/s²", area: "m/s" };
+    if (metric === "heartrate") return { value: "bpm", area: null };
+    return { value: "", area: null };
+  };
   const xAxisTitle = "Time from start (s)";
   const allShown = results.length > 0 && results.every((r) => !hiddenMap[r.name]);
   const shownCount = results.filter((r) => !hiddenMap[r.name]).length;
@@ -232,6 +256,9 @@ export default function Analysis() {
           <div className={`${styles.row} ${styles.head}`}>
             <div className={styles.cellCheckbox}>Show</div>
             <div className={styles.cellName}>Filename</div>
+            <div className={styles.cellFit}>Equation (m/s²)</div>
+            <div className={styles.cellMetric}>A0 (m/s²)</div>
+            <div className={styles.cellMetric}>S0 (m/s)</div>
             <div className={styles.cellColor}>Color</div>
           </div>
           {results.map((item) => (
@@ -249,6 +276,17 @@ export default function Analysis() {
                 />
               </div>
               <div className={styles.cellName}>{item.name}</div>
+              <div className={styles.cellFit}>
+                {item.profile?.fit
+                  ? `a = ${fmt(item.profile.fit.A0)} + (${fmt(item.profile.fit.AS_slope)}) · v`
+                  : "—"}
+              </div>
+              <div className={styles.cellMetric}>
+                {item.profile?.fit ? fmt(item.profile.fit.A0) : "—"}
+              </div>
+              <div className={styles.cellMetric}>
+                {item.profile?.fit ? fmt(item.profile.fit.S0) : "—"}
+              </div>
               <div className={styles.cellColor}>
                 <input
                   type="color"
@@ -270,7 +308,6 @@ export default function Analysis() {
       ) : (
         <AspChart
           profiles={visibleResults}
-          title="Acceleration Speed Profile"
           colorMap={colors}
           defaultColor={defaultColor}
           onPointSelect={onAspPointSelect}
@@ -310,10 +347,10 @@ export default function Analysis() {
                 />
                 <span>Select all</span>
               </label>
-            <div className={styles.selectionSummary}>
-              {visibleSelectedPoints.length} points · {selectedVisibleCount} selected
+              <div className={styles.selectionSummary}>
+                {visibleSelectedPoints.length} points · {selectedVisibleCount} selected
+              </div>
             </div>
-          </div>
             <div className={styles.selectionControls}>
               <label className={styles.selectionLabel}>
                 +/- points
@@ -370,7 +407,7 @@ export default function Analysis() {
             >
               <div className={styles.selectionCellCheckbox}></div>
               <button
-                className={`${styles.selectionSortBtn} ${styles.selectionSortFileBtn}`}
+                className={`${styles.selectionSortBtn} ${styles.selectionSortBtnFixed}`}
                 type="button"
                 onClick={() => toggleSortRule("name")}
               >
@@ -458,16 +495,27 @@ export default function Analysis() {
               <span>Mean</span>
               <span>Median</span>
               <span>Max</span>
+              <span>Area</span>
             </div>
-            {combinedStatsRows.map((row) => (
-              <div className={styles.statsRow} key={row.label}>
-                <span className={styles.statsLabel}>{row.label}</span>
-                <span className={styles.statsValue}>{fmt(row.values?.min)}</span>
-                <span className={styles.statsValue}>{fmt(row.values?.mean)}</span>
-                <span className={styles.statsValue}>{fmt(row.values?.median)}</span>
-                <span className={styles.statsValue}>{fmt(row.values?.max)}</span>
-              </div>
-            ))}
+            {combinedStatsRows.map((row) => {
+              const units = metricUnits(row.metric);
+              return (
+                <div className={styles.statsRow} key={row.label}>
+                  <span className={styles.statsLabel}>{row.label}</span>
+                  <span className={styles.statsValue}>{fmtWithUnit(row.values?.min, units.value)}</span>
+                  <span className={styles.statsValue}>
+                    {fmtWithUnit(row.values?.mean, units.value)}
+                  </span>
+                  <span className={styles.statsValue}>
+                    {fmtWithUnit(row.values?.median, units.value)}
+                  </span>
+                  <span className={styles.statsValue}>{fmtWithUnit(row.values?.max, units.value)}</span>
+                  <span className={styles.statsValue}>
+                    {units.area ? fmtWithUnit(row.values?.area, units.area) : "-"}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
           <div className={styles.timeseriesGrid}>
@@ -478,6 +526,7 @@ export default function Analysis() {
               selectedPoints={visibleSelectedPoints}
               pointWindow={pointWindow}
               timeWindowSec={timeWindowSec}
+              yReferenceLines={speedReferenceLines}
             />
             <TimeSeriesChart
               title="Acceleration"

@@ -43,6 +43,8 @@
 }
 
 .count {
+  display: flex;
+  align-items: center;
   color: var(--black);
   font-size: 12px;
 }
@@ -53,7 +55,15 @@
   padding: 0;
   border: 1px solid var(--black);
   border-radius: 8px;
-  background: white;
+}
+
+.colorInput::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.colorInput::-webkit-color-swatch {
+  border: none;
+  border-radius: 7px;
 }
 
 .table {
@@ -64,7 +74,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 44px 1fr 120px;
+  grid-template-columns: 44px 1fr 210px 120px 120px 120px;
   gap: 10px;
   align-items: center;
   padding: 12px 14px;
@@ -101,6 +111,18 @@
   justify-content: flex-end;
 }
 
+.cellFit {
+  color: var(--black);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.cellMetric {
+  color: var(--black);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
 .empty {
   border-radius: 0;
   padding: 12px 14px;
@@ -123,7 +145,7 @@
 
 .statsRow {
   display: grid;
-  grid-template-columns: 330px repeat(4, minmax(52px, 1fr));
+  grid-template-columns: 330px repeat(5, minmax(52px, 1fr));
   gap: 8px;
   align-items: center;
   padding: 12px 14px;
@@ -196,17 +218,18 @@
   border: none;
   color: var(--black);
   font: inherit;
-  text-align: right;
+  text-align: left;
   cursor: pointer;
   padding: 0;
 }
 
-.selectionSortFileBtn {
-  text-align: left;
+.selectionSortBtnFixed {
+  width: 120px;
 }
 
 .selectionSummary {
-  min-width: 160px;
+  display: flex;
+  align-items: center;
   color: var(--black);
   font-size: 12px;
 }
@@ -247,7 +270,7 @@
 }
 
 .selectionCol {
-  text-align: right;
+  text-align: left;
   color: var(--black);
   font-size: inherit;
   font-variant-numeric: tabular-nums;
