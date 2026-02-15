@@ -21,9 +21,7 @@ export default function AspChart({
 
     const allTraces = [];
     const shapes = [];
-    const globalMinSpeed = Math.min(
-      ...valid.map((v) => Number(v.profile?.meta?.min_speed ?? 0)),
-    );
+    const globalMinSpeed = Math.min(...valid.map((v) => Number(v.profile?.meta?.min_speed ?? 0)));
     const globalMaxSpeed = Math.max(
       ...valid.flatMap((v) => (v.profile?.all_points || []).map((p) => p.speed)),
     );
@@ -87,12 +85,8 @@ export default function AspChart({
         const localMin = sortedAll[0].speed;
         const localMax = sortedAll[sortedAll.length - 1].speed;
         const s0 = Number(profile?.fit?.S0);
-        const fitMin = Math.min(
-          ...[localMin, 0, Number.isFinite(s0) ? s0 : localMin],
-        );
-        const fitMax = Math.max(
-          ...[localMax, 0, Number.isFinite(s0) ? s0 : localMax],
-        );
+        const fitMin = Math.min(...[localMin, 0, Number.isFinite(s0) ? s0 : localMin]);
+        const fitMax = Math.max(...[localMax, 0, Number.isFinite(s0) ? s0 : localMax]);
         const fitX = [fitMin, fitMax];
         const fitY = fitX.map((x) => profile.fit.A0 + profile.fit.AS_slope * x);
         allTraces.push({
@@ -119,23 +113,31 @@ export default function AspChart({
     if (!containerRef.current) return undefined;
     const node = containerRef.current;
     if (!data) return undefined;
+    const cssBlack =
+      getComputedStyle(document.documentElement).getPropertyValue("--black").trim() || "#000123";
 
     const layout = {
-      title,
-      margin: { l: 50, r: 20, t: 40, b: 90 },
+      title: { text: title, font: { color: cssBlack } },
+      font: { color: cssBlack },
+      margin: { l: 50, r: 20, t: 40, b: 110 },
       xaxis: {
-        title: "Speed (m/s)",
+        title: { text: "Speed (m/s)", font: { color: cssBlack } },
+        tickfont: { color: cssBlack },
         range: [data.minSpeed, data.maxSpeed],
       },
-      yaxis: { title: "Acceleration" },
+      yaxis: {
+        title: { text: "Acceleration", font: { color: cssBlack } },
+        tickfont: { color: cssBlack },
+      },
       showlegend: true,
       shapes: data.shapes,
       legend: {
         orientation: "h",
         x: 0,
-        y: -0.35,
+        y: -0.22,
         xanchor: "left",
         yanchor: "top",
+        font: { color: cssBlack },
       },
     };
 

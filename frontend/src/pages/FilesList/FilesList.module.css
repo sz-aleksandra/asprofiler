@@ -17,7 +17,7 @@
   border: none;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 
 .sectionTitle {
@@ -73,7 +73,7 @@
 .toolbarLeft {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .selectAll {
@@ -180,7 +180,7 @@
 
 .inlinePanel {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
   padding: 10px 14px 14px 54px;
   border-bottom: 1px solid var(--black);

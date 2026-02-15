@@ -30,19 +30,30 @@ export default function TimeSeriesChart({ title, time, series, xTitle = "Time se
     if (!containerRef.current) return undefined;
     const node = containerRef.current;
     if (!traces) return undefined;
+    const cssBlack =
+      getComputedStyle(document.documentElement).getPropertyValue("--black").trim() || "#000123";
 
     const layout = {
-      title,
-      margin: { l: 50, r: 20, t: 40, b: 95 },
-      xaxis: { title: xTitle, type: "linear" },
-      yaxis: { title: title },
+      title: { text: title, font: { color: cssBlack } },
+      font: { color: cssBlack },
+      margin: { l: 50, r: 20, t: 40, b: 110 },
+      xaxis: {
+        title: { text: xTitle, font: { color: cssBlack } },
+        tickfont: { color: cssBlack },
+        type: "linear",
+      },
+      yaxis: {
+        title: { text: title, font: { color: cssBlack } },
+        tickfont: { color: cssBlack },
+      },
       showlegend: true,
       legend: {
         orientation: "h",
         x: 0,
-        y: -0.35,
+        y: -0.22,
         xanchor: "left",
         yanchor: "top",
+        font: { color: cssBlack },
       },
     };
 

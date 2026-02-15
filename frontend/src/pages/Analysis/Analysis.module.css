@@ -17,7 +17,7 @@
   border: none;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
 }
 
 .toolbar {
@@ -31,7 +31,7 @@
 .toolbarLeft {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .selectAll {
@@ -132,7 +132,7 @@
 .fileSection {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .statsCard {
@@ -172,5 +172,5 @@
 .timeseriesGrid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 24px;
+  gap: 28px;
 }

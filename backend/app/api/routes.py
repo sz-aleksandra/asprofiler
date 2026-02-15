@@ -71,7 +71,9 @@ def analyze(req: AnalyzeRequest):
                 safe,
                 total_rows,
             )
-            profile = build_as_profile(times, speeds, accels, hearts, params, total_rows)
+            profile = build_as_profile(
+                times, speeds, accels, hearts, params, total_rows
+            )
             results.append({"name": safe, "profile": profile})
         except HTTPException as e:
             results.append({"name": safe, "error": str(e.detail)})

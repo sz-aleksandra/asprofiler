@@ -8,7 +8,9 @@ from fastapi import HTTPException
 from app.models import AnalyzeParams
 
 
-def load_series(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None, int]:
+def load_series(
+    path: Path,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None, int]:
     speeds = []
     accels = []
     times = []
@@ -238,7 +240,9 @@ def build_as_profile(
         "stats": {
             "speed": _stats(speeds),
             "acceleration": _stats(accels),
-            "heartrate": _stats(heart_arr) if heart_arr is not None and len(heart_arr) else None,
+            "heartrate": _stats(heart_arr)
+            if heart_arr is not None and len(heart_arr)
+            else None,
         },
         "meta": {
             "n_all_points": int(len(all_s)),
