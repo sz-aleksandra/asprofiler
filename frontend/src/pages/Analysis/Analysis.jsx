@@ -318,8 +318,8 @@ export default function Analysis() {
       )}
       {visibleResults.length > 0 && (
         <div className={styles.selectionSection}>
-          <div className={styles.selectionToolbar}>
-            <div className={styles.selectionToolbarLeft}>
+          <div className={styles.toolbar}>
+            <div className={styles.toolbarLeft}>
               <label className={styles.selectAll}>
                 <input
                   type="checkbox"
@@ -347,9 +347,9 @@ export default function Analysis() {
                 />
                 <span>Select all</span>
               </label>
-              <div className={styles.selectionSummary}>
+              <span className={styles.count}>
                 {visibleSelectedPoints.length} points · {selectedVisibleCount} selected
-              </div>
+              </span>
             </div>
             <div className={styles.selectionControls}>
               <label className={styles.selectionLabel}>
@@ -397,7 +397,7 @@ export default function Analysis() {
                   });
                 }}
               >
-                Remove selected
+                Delete selected
               </button>
             </div>
           </div>

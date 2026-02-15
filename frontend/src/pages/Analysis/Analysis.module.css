@@ -18,6 +18,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  margin-top: 14px;
 }
 
 .toolbar {
@@ -26,6 +27,7 @@
   justify-content: space-between;
   padding: 12px 14px;
   border-bottom: 1px solid var(--black);
+  background: transparent;
 }
 
 .toolbarLeft {
@@ -45,8 +47,8 @@
 .count {
   display: flex;
   align-items: center;
-  color: var(--black);
   font-size: 12px;
+  color: var(--black);
 }
 
 .colorInput {
@@ -187,15 +189,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  flex-wrap: wrap;
   padding: 12px 14px;
   border-bottom: 1px solid var(--black);
-}
-
-.selectionToolbarLeft {
-  display: flex;
-  align-items: center;
-  gap: 14px;
 }
 
 .selectionTable {
@@ -225,13 +220,6 @@
 
 .selectionSortBtnFixed {
   width: 120px;
-}
-
-.selectionSummary {
-  display: flex;
-  align-items: center;
-  color: var(--black);
-  font-size: 12px;
 }
 
 .selectionControls {
