@@ -29,35 +29,34 @@ export default function AspChart({
     const shapes = [];
     const globalMinSpeed = Math.min(...valid.map((v) => Number(v.profile?.meta?.min_speed ?? 0)));
     const maxSpeedCandidates = valid.flatMap((v) => v.profile?.timeseries?.speed || []);
+    const maxAccelCandidates = valid.flatMap((v) => v.profile?.timeseries?.acceleration || []);
     const globalMaxSpeed = maxSpeedCandidates.length ? Math.max(...maxSpeedCandidates) : 0;
+    const globalMaxAccel = maxAccelCandidates.length ? Math.max(...maxAccelCandidates) : 0;
 
     valid.forEach((item) => {
       const base = colorMap?.[item.name] || defaultColor || null;
       const profile = item.profile;
       const cutoff = Number(profile?.meta?.min_speed ?? 0);
-      const { time: tsTime = [], speed: tsSpeed = [], acceleration: tsAccel = [] } =
-        profile?.timeseries || {};
-      const positiveOnly = Boolean(profile?.meta?.positive_only);
-      const toKey = (speed, accel) =>
-        `${Number(speed).toFixed(6)}|${Number(accel).toFixed(6)}`;
+      const {
+        time: tsTime = [],
+        speed: tsSpeed = [],
+        acceleration: tsAccel = [],
+      } = profile?.timeseries || {};
+      const toKey = (speed, accel) => `${Number(speed).toFixed(6)}|${Number(accel).toFixed(6)}`;
 
-      const all = (tsTime || [])
-        .map((t, i) => ({
-          index: i,
-          time: Number(t),
-          speed: Number(tsSpeed[i]),
-          accel: Number(tsAccel[i]),
-        }))
-        .filter((p) => !positiveOnly || p.accel > 0);
+      const all = (tsTime || []).map((t, i) => ({
+        index: i,
+        time: Number(t),
+        speed: Number(tsSpeed[i]),
+        accel: Number(tsAccel[i]),
+      }));
 
       const sortedAll = [...all].sort((a, b) => a.speed - b.speed);
       const included = sortedAll.filter((p) => p.speed >= cutoff);
       const rejected = sortedAll.filter((p) => p.speed < cutoff);
       const selectedRaw = Array.isArray(profile?.points) ? profile.points : [];
       let selected = selectedRaw;
-      if (
-        !selected.every((p) => Number.isInteger(p?.index) && Number.isFinite(Number(p?.time)))
-      ) {
+      if (!selected.every((p) => Number.isInteger(p?.index) && Number.isFinite(Number(p?.time)))) {
         const buckets = new Map();
         all.forEach((p) => {
           const key = toKey(p.speed, p.accel);
@@ -136,8 +135,8 @@ export default function AspChart({
         xref: "x",
         yref: "paper",
         line: {
-          color: base ? base : "#666",
-          width: 1.5,
+          color: cssBlack,
+          width: 1,
           dash: "dash",
         },
       });
@@ -219,6 +218,7 @@ export default function AspChart({
       shapes,
       minSpeed: Number.isFinite(globalMinSpeed) ? globalMinSpeed : 0,
       maxSpeed: Number.isFinite(globalMaxSpeed) ? globalMaxSpeed : 0,
+      maxAccel: Number.isFinite(globalMaxAccel) ? globalMaxAccel : 0,
     };
   }, [profiles, colorMap, defaultColor, hiddenMap, selectedPoints, pointWindow]);
 
@@ -238,9 +238,26 @@ export default function AspChart({
       yaxis: {
         title: { text: "Acceleration", font: { color: cssBlack } },
         tickfont: { color: cssBlack },
+        range: [0, Math.max(0, data.maxAccel)],
       },
       showlegend: true,
-      shapes: data.shapes,
+      shapes: [
+        ...data.shapes,
+        {
+          type: "line",
+          x0: 0,
+          x1: 1,
+          y0: 0,
+          y1: 0,
+          xref: "paper",
+          yref: "y",
+          line: {
+            color: cssBlack,
+            width: 1,
+            dash: "dash",
+          },
+        },
+      ],
       legend: {
         orientation: "h",
         x: 0,
