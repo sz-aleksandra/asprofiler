@@ -1,31 +1,33 @@
-import { useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
 
 import AspChart from "../../components/AspChart/AspChart";
+import DistributionChart from "../../components/DistributionChart/DistributionChart";
 import TimeSeriesChart from "../../components/TimeSeriesChart/TimeSeriesChart";
+import { getAnalysis } from "../../services/filesApi";
+import { hexToRgba } from "../../utils/hexToRgba";
 
 import styles from "./Analysis.module.css";
 
 export default function Analysis() {
-  const location = useLocation();
+  const { analysisId } = useParams();
 
-  const analysis = useMemo(() => {
-    const state = location.state;
-    if (state && state.results) return state.results;
-    const raw = localStorage.getItem("analysis_results");
-    if (!raw) return [];
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return [];
-    }
-  }, [location.state]);
-
-  const [results, setResults] = useState(analysis);
+  const [fetchedResults, setFetchedResults] = useState(null);
 
   useEffect(() => {
-    setResults(analysis);
-  }, [analysis]);
+    if (!analysisId) return undefined;
+
+    getAnalysis(analysisId)
+      .then((payload) => {
+        setFetchedResults(Array.isArray(payload?.results) ? payload.results : []);
+      })
+      .catch(() => {
+        setFetchedResults([]);
+      });
+  }, [analysisId]);
+
+  const results = fetchedResults || [];
+  const loadingAnalysis = Boolean(analysisId) && fetchedResults === null;
 
   const [colors, setColors] = useState(() => {
     const raw = localStorage.getItem("analysis_colors_map");
@@ -36,7 +38,6 @@ export default function Analysis() {
       return {};
     }
   });
-  const defaultColor = localStorage.getItem("analysis_default_color") || "#000000";
   const [hiddenMap, setHiddenMap] = useState({});
   const [selectedPoints, setSelectedPoints] = useState([]);
   const [markedPointMap, setMarkedPointMap] = useState({});
@@ -47,7 +48,9 @@ export default function Analysis() {
   const pointKey = (p) => `${p.name}::${p.index}`;
   const visibleFileNames = new Set(visibleResults.map((r) => r.name));
   const visibleSelectedPoints = selectedPoints.filter((p) => visibleFileNames.has(p.name));
-  const selectedVisibleCount = visibleSelectedPoints.filter((p) => markedPointMap[pointKey(p)]).length;
+  const selectedVisibleCount = visibleSelectedPoints.filter(
+    (p) => markedPointMap[pointKey(p)],
+  ).length;
   const filteredSelectedPoints = useMemo(() => {
     const sorted = [...visibleSelectedPoints];
     if (!pointsSortRules.length) return sorted;
@@ -93,14 +96,14 @@ export default function Analysis() {
     const heartrateSeries = [];
 
     visibleResults.forEach((item) => {
-      const ts = item.profile?.timeseries || {};
-      const color = colors[item.name] || defaultColor;
+      const ts = item.profile?.timeseries;
+      const color = colors[item.name];
       const seriesName = item.name;
 
-      if (ts.time?.length && ts.speed?.length) {
+      if (ts?.time?.length && ts.speed?.length) {
         speedSeries.push({ name: seriesName, values: ts.speed, color, x: ts.time });
       }
-      if (ts.time?.length && ts.acceleration?.length) {
+      if (ts?.time?.length && ts.acceleration?.length) {
         accelerationSeries.push({
           name: seriesName,
           values: ts.acceleration,
@@ -108,24 +111,24 @@ export default function Analysis() {
           x: ts.time,
         });
       }
-      if (ts.time?.length && ts.heartrate?.length) {
+      if (ts?.time?.length && ts.heartrate?.length) {
         heartrateSeries.push({ name: seriesName, values: ts.heartrate, color, x: ts.time });
       }
     });
 
     return { speedSeries, accelerationSeries, heartrateSeries };
-  }, [visibleResults, colors, defaultColor]);
+  }, [visibleResults, colors]);
   const speedReferenceLines = useMemo(
     () =>
       visibleResults
         .map((item) => ({
           y: Number(item?.profile?.meta?.min_speed),
-          color: colors[item.name] || defaultColor,
+          color: colors[item.name],
           width: 1.5,
           dash: "dash",
         }))
         .filter((line) => Number.isFinite(line.y)),
-    [visibleResults, colors, defaultColor],
+    [visibleResults, colors],
   );
 
   const combinedStatsRows = useMemo(() => {
@@ -154,6 +157,153 @@ export default function Analysis() {
     });
     return rows;
   }, [visibleResults]);
+
+  const violinCharts = useMemo(() => {
+    const buildMetricChart = ({ key, title, unit }) => {
+      const traces = visibleResults
+        .filter((item) => item.profile?.timeseries?.[key]?.length)
+        .map((item) => {
+          const y = item.profile.timeseries[key].map((value) => Number(value));
+          const color = colors[item.name];
+          return {
+            key: item.name,
+            type: "violin",
+            name: item.name,
+            x: new Array(y.length).fill(item.name),
+            y,
+            box: { visible: true },
+            meanline: { visible: true },
+            points: false,
+            spanmode: "soft",
+            scalemode: "width",
+            line: { color },
+            fillcolor: hexToRgba(color, 0.4),
+            opacity: 0.9,
+            showlegend: false,
+          };
+        });
+
+      if (!traces.length) return null;
+      return {
+        key,
+        title,
+        traces,
+        violinMode: true,
+        xAxis: {
+          title: { text: "File" },
+          type: "category",
+        },
+        yAxis: {
+          title: { text: unit },
+        },
+      };
+    };
+
+    return [
+      buildMetricChart({ key: "acceleration", title: "Acceleration Distribution", unit: "m/s²" }),
+      buildMetricChart({ key: "speed", title: "Speed Distribution", unit: "m/s" }),
+      buildMetricChart({ key: "heartrate", title: "Heartrate Distribution", unit: "bpm" }),
+    ].filter(Boolean);
+  }, [visibleResults, colors]);
+
+  const avHeatmaps = useMemo(() => {
+    const getFilteredPoints = (item) => item.profile?.all_points_filtered || [];
+    const allPoints = visibleResults.flatMap((item) => getFilteredPoints(item));
+    const allSpeed = allPoints.map((point) => Number(point.speed));
+    const allAccel = allPoints.map((point) => Number(point.accel));
+
+    if (!allSpeed.length || !allAccel.length) return [];
+
+    const minSpeed = Math.min(...allSpeed);
+    const maxSpeed = Math.max(...allSpeed);
+    const minAccel = Math.min(...allAccel);
+    const maxAccel = Math.max(...allAccel);
+    const binCount = 10;
+    const safeSpeedBinSize = Math.max((maxSpeed - minSpeed) / binCount, 0.1);
+    const safeAccelBinSize = Math.max((maxAccel - minAccel) / binCount, 0.05);
+
+    const getBinIndex = (value, start, size, count) => {
+      if (value <= start) return 0;
+      const raw = Math.floor((value - start) / size);
+      if (raw >= count) return count - 1;
+      return raw;
+    };
+
+    const maxBinCount = visibleResults.reduce((globalMax, item) => {
+      const bins = new Map();
+      getFilteredPoints(item).forEach((point) => {
+        const sx = Number(point.speed);
+        const ay = Number(point.accel);
+        const xBin = getBinIndex(sx, minSpeed, safeSpeedBinSize, binCount);
+        const yBin = getBinIndex(ay, minAccel, safeAccelBinSize, binCount);
+        const key = `${xBin}:${yBin}`;
+        bins.set(key, (bins.get(key) || 0) + 1);
+      });
+
+      const localMax = bins.size ? Math.max(...bins.values()) : 0;
+      return Math.max(globalMax, localMax);
+    }, 0);
+
+    return visibleResults
+      .map((item) => {
+        const counts = Array.from({ length: binCount }, () => Array(binCount).fill(0));
+        const color = colors[item.name];
+
+        getFilteredPoints(item).forEach((point) => {
+          const sx = Number(point.speed);
+          const ay = Number(point.accel);
+          const xBin = getBinIndex(sx, minSpeed, safeSpeedBinSize, binCount);
+          const yBin = getBinIndex(ay, minAccel, safeAccelBinSize, binCount);
+          counts[yBin][xBin] += 1;
+        });
+
+        const flatCounts = counts.flat();
+        if (!flatCounts.some((value) => value > 0)) return null;
+
+        const x = Array.from(
+          { length: binCount },
+          (_, idx) => minSpeed + safeSpeedBinSize * idx + safeSpeedBinSize / 2,
+        );
+        const y = Array.from(
+          { length: binCount },
+          (_, idx) => minAccel + safeAccelBinSize * idx + safeAccelBinSize / 2,
+        );
+
+        return {
+          key: item.name,
+          title: `${item.name} Acceleration vs Speed`,
+          traces: [
+            {
+              type: "heatmap",
+              baseColor: color,
+              x,
+              y,
+              z: counts,
+              showscale: true,
+              coloraxis: "coloraxis",
+              zmin: 0,
+              zmax: maxBinCount,
+              xgap: 1,
+              ygap: 1,
+              hovertemplate:
+                "Speed bin center: %{x:.3f} m/s<br>Acceleration bin center: %{y:.3f} m/s²<br>Count: %{z}<extra></extra>",
+            },
+          ],
+          showLegend: false,
+          xAxis: {
+            title: { text: "Speed (m/s)" },
+            type: "linear",
+            range: [minSpeed, maxSpeed],
+          },
+          yAxis: {
+            title: { text: "Acceleration (m/s²)" },
+            type: "linear",
+            range: [minAccel, maxAccel],
+          },
+        };
+      })
+      .filter(Boolean);
+  }, [visibleResults, colors]);
 
   const fmt = (v) =>
     v === undefined || v === null || Number.isNaN(v) ? "—" : Number(v).toFixed(3);
@@ -213,7 +363,16 @@ export default function Analysis() {
     visibleSelectedPoints.length > 0 &&
     visibleSelectedPoints.every((p) => Boolean(markedPointMap[pointKey(p)]));
 
-  if (analysis.length === 0) {
+  if (loadingAnalysis) {
+    return (
+      <section className={styles.page}>
+        <h1 className={styles.title}>Analysis</h1>
+        <p>Loading analysis...</p>
+      </section>
+    );
+  }
+
+  if (results.length === 0) {
     return (
       <section className={styles.page}>
         <h1 className={styles.title}>Analysis</h1>
@@ -291,7 +450,7 @@ export default function Analysis() {
                 <input
                   type="color"
                   className={styles.colorInput}
-                  value={colors[item.name] || defaultColor}
+                  value={colors[item.name]}
                   onChange={(e) => {
                     const next = { ...colors, [item.name]: e.target.value };
                     localStorage.setItem("analysis_colors_map", JSON.stringify(next));
@@ -309,7 +468,6 @@ export default function Analysis() {
         <AspChart
           profiles={visibleResults}
           colorMap={colors}
-          defaultColor={defaultColor}
           onPointSelect={onAspPointSelect}
           onPointsSelect={onAspPointsSelect}
           selectedPoints={visibleSelectedPoints}
@@ -380,9 +538,7 @@ export default function Analysis() {
                 disabled={!selectedVisibleCount}
                 onClick={() => {
                   const removeKeys = new Set(
-                    visibleSelectedPoints
-                      .filter((p) => markedPointMap[pointKey(p)])
-                      .map(pointKey),
+                    visibleSelectedPoints.filter((p) => markedPointMap[pointKey(p)]).map(pointKey),
                   );
                   setSelectedPoints((prev) => prev.filter((p) => !removeKeys.has(pointKey(p))));
                   setMarkedPointMap((prev) => {
@@ -502,14 +658,18 @@ export default function Analysis() {
               return (
                 <div className={styles.statsRow} key={row.label}>
                   <span className={styles.statsLabel}>{row.label}</span>
-                  <span className={styles.statsValue}>{fmtWithUnit(row.values?.min, units.value)}</span>
+                  <span className={styles.statsValue}>
+                    {fmtWithUnit(row.values?.min, units.value)}
+                  </span>
                   <span className={styles.statsValue}>
                     {fmtWithUnit(row.values?.mean, units.value)}
                   </span>
                   <span className={styles.statsValue}>
                     {fmtWithUnit(row.values?.median, units.value)}
                   </span>
-                  <span className={styles.statsValue}>{fmtWithUnit(row.values?.max, units.value)}</span>
+                  <span className={styles.statsValue}>
+                    {fmtWithUnit(row.values?.max, units.value)}
+                  </span>
                   <span className={styles.statsValue}>
                     {units.area ? fmtWithUnit(row.values?.area, units.area) : "-"}
                   </span>
@@ -547,6 +707,36 @@ export default function Analysis() {
               />
             )}
           </div>
+
+          {avHeatmaps.length > 0 && (
+            <div className={styles.timeseriesGrid}>
+              {avHeatmaps.map((chart) => (
+                <DistributionChart
+                  key={chart.key}
+                  title={chart.title}
+                  traces={chart.traces}
+                  showLegend={chart.showLegend}
+                  xAxis={chart.xAxis}
+                  yAxis={chart.yAxis}
+                />
+              ))}
+            </div>
+          )}
+
+          {violinCharts.length > 0 && (
+            <div className={styles.timeseriesGrid}>
+              {violinCharts.map((chart) => (
+                <DistributionChart
+                  key={chart.key}
+                  title={chart.title}
+                  traces={chart.traces}
+                  violinMode={chart.violinMode}
+                  xAxis={chart.xAxis}
+                  yAxis={chart.yAxis}
+                />
+              ))}
+            </div>
+          )}
         </section>
       )}
     </section>

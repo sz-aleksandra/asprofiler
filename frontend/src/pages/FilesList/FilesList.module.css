@@ -115,6 +115,7 @@
 .primaryBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .primaryBtn:hover {
@@ -177,11 +178,12 @@
 .linkPrimary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .linkPrimary:hover {
-  background: red;
-  color: white;
+  background: white;
+  color: red;
   border: 1px solid red;
 }
 

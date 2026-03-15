@@ -1,0 +1,161 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  color: var(--black);
+}
+
+.inlineTable {
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--black);
+  background: transparent;
+}
+
+.toolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.selectAll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--black);
+}
+
+.count {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: var(--black);
+}
+
+.dangerBtn {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--white);
+  background: var(--red);
+  color: var(--white);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dangerBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.dangerBtn:hover {
+  background: red;
+  color: white;
+  border: 1px solid white;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 44px 220px 1fr 80px 160px;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--black);
+  background: transparent;
+}
+
+.head {
+  font-weight: 600;
+  color: var(--black);
+}
+
+.cellCheckbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cellCreated,
+.cellNames,
+.cellCount {
+  color: var(--black);
+}
+
+.cellCreated {
+  white-space: nowrap;
+}
+
+.cellNames {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellCount {
+  font-variant-numeric: tabular-nums;
+}
+
+.cellActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.linkPrimary {
+  background: var(--white);
+  border: 1px solid var(--red);
+  border-radius: 6px;
+  color: var(--red);
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.linkPrimary:hover {
+  background: white;
+  color: red;
+  border: 1px solid red;
+}
+
+.linkDanger {
+  background: var(--red);
+  color: var(--white);
+  border: 1px solid var(--white);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkDanger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.linkDanger:hover {
+  background: red;
+  color: white;
+  border: 1px solid white;
+}
+
+.emptyRow {
+  padding: 12px 14px;
+  color: var(--black);
+  background: transparent;
+}

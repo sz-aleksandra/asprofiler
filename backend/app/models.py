@@ -12,10 +12,13 @@ class AnalyzeParams(BaseModel):
     positive_only: bool = True
     ci_z: float = Field(1.96, gt=0)
 
+class AnalyzeItemRequest(BaseModel):
+    name: str
+    params: AnalyzeParams | None = None
+
 
 class AnalyzeRequest(BaseModel):
-    names: List[str]
-    params: AnalyzeParams | None = None
+    items: List[AnalyzeItemRequest]
 
 
 class FileInfo(BaseModel):

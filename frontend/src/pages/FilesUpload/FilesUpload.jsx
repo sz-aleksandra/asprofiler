@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Dropzone from "../../components/Dropzone/Dropzone";
 import Toast from "../../components/Toast/Toast";
 
-import { deleteFile, deleteFiles, listFiles, uploadFiles } from "../../services/filesApi";
+import { deleteFiles, listFiles, uploadFiles } from "../../services/filesApi";
 import { formatBytes } from "../../utils/formatBytes";
 
 import styles from "./FilesUpload.module.css";
@@ -61,7 +61,7 @@ export default function FilesUpload() {
   const onDeleteOne = async (name) => {
     setBusy(true);
     try {
-      await deleteFile(name);
+      await deleteFiles([name]);
       await refresh();
       setToast({ message: `Deleted: ${name}`, type: "success" });
     } catch (e) {

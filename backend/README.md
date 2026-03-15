@@ -19,6 +19,5 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 - `GET /files`
 - `POST /files` (multipart)
-- `DELETE /files/{name}`
-- `POST /files/delete`
+- `DELETE /files`
 - `POST /analyze`

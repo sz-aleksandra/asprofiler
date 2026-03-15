@@ -2,13 +2,13 @@ import { useEffect, useMemo, useRef } from "react";
 import Plotly from "plotly.js-dist-min";
 
 import styles from "./AspChart.module.css";
+import { getCssVar } from "../../utils/getCssVar";
 import { hexToRgba } from "../../utils/hexToRgba";
 
 export default function AspChart({
   profiles,
   title = "Acceleration Speed Profile",
   colorMap,
-  defaultColor,
   hiddenMap,
   onPointSelect,
   onPointsSelect,
@@ -16,8 +16,7 @@ export default function AspChart({
   pointWindow,
 }) {
   const containerRef = useRef(null);
-  const cssBlack =
-    getComputedStyle(document.documentElement).getPropertyValue("--black").trim() || "#000123";
+  const cssBlack = getCssVar("--black");
 
   const data = useMemo(() => {
     const valid = (profiles || [])
@@ -34,7 +33,7 @@ export default function AspChart({
     const globalMaxAccel = maxAccelCandidates.length ? Math.max(...maxAccelCandidates) : 0;
 
     valid.forEach((item) => {
-      const base = colorMap?.[item.name] || defaultColor || null;
+      const base = colorMap?.[item.name];
       const profile = item.profile;
       const cutoff = Number(profile?.meta?.min_speed ?? 0);
       const {
@@ -155,7 +154,7 @@ export default function AspChart({
           mode: "lines",
           x: fitX,
           y: fitY,
-          line: base ? { color: base, width: 2 } : { width: 2 },
+          line: { color: base, width: 2 },
           showlegend: true,
         });
       }
@@ -181,12 +180,12 @@ export default function AspChart({
               x: windowPoints.map((p) => p.speed),
               y: windowPoints.map((p) => p.accel),
               line: {
-                color: base || "#000123",
+                color: base,
                 width: 1.5,
               },
               marker: {
                 size: markerSizes,
-                color: base || "#000123",
+                color: base,
               },
               showlegend: false,
             });
@@ -204,7 +203,7 @@ export default function AspChart({
             y: ordered.map((p) => p.accel),
             marker: {
               size: 7,
-              color: base || "#000123",
+              color: base,
               symbol: "diamond",
             },
             showlegend: false,
@@ -220,7 +219,7 @@ export default function AspChart({
       maxSpeed: Number.isFinite(globalMaxSpeed) ? globalMaxSpeed : 0,
       maxAccel: Number.isFinite(globalMaxAccel) ? globalMaxAccel : 0,
     };
-  }, [profiles, colorMap, defaultColor, hiddenMap, selectedPoints, pointWindow]);
+  }, [profiles, colorMap, hiddenMap, selectedPoints, pointWindow]);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;

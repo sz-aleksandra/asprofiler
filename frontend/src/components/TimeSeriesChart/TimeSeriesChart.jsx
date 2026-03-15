@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import Plotly from "plotly.js-dist-min";
 
 import styles from "./TimeSeriesChart.module.css";
+import { getCssVar } from "../../utils/getCssVar";
 import { hexToRgba } from "../../utils/hexToRgba";
 
 export default function TimeSeriesChart({
@@ -15,8 +16,7 @@ export default function TimeSeriesChart({
   yReferenceLines = [],
 }) {
   const containerRef = useRef(null);
-  const cssBlack =
-    getComputedStyle(document.documentElement).getPropertyValue("--black").trim() || "#000123";
+  const cssBlack = getCssVar("--black");
 
   const plotData = useMemo(() => {
     if (!series?.length) return null;
@@ -26,7 +26,7 @@ export default function TimeSeriesChart({
         return x?.length && s.values?.length;
       })
       .map((s) => {
-        const baseColor = s.color || "#000123";
+        const baseColor = s.color;
         return {
           name: s.name,
           type: "scattergl",
@@ -99,10 +99,10 @@ export default function TimeSeriesChart({
             mode: "lines+markers",
             x: xWindow,
             y: yWindow,
-            line: { color: target?.color || "#000123", width: 2 },
+            line: { color: target?.color, width: 2 },
             marker: {
               size: markerSizes,
-              color: target?.color || "#000123",
+              color: target?.color,
               line: { width: 0 },
             },
             showlegend: false,
@@ -116,7 +116,7 @@ export default function TimeSeriesChart({
           y: [yData[selectedIndex]],
           marker: {
             size: 7,
-            color: target?.color || "#000123",
+            color: target?.color,
             symbol: "diamond",
             line: { width: 0 },
           },

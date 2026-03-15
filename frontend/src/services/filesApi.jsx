@@ -21,22 +21,30 @@ export async function uploadFiles(files) {
   return request("/files", { method: "POST", body });
 }
 
-export async function deleteFile(name) {
-  return request(`/files/${encodeURIComponent(name)}`, { method: "DELETE" });
-}
-
 export async function deleteFiles(names) {
-  return request("/files/delete", {
-    method: "POST",
+  return request("/files", {
+    method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ names }),
   });
 }
 
-export async function analyzeFiles(names, params) {
+export async function analyzeFiles(items) {
   return request("/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ names, params }),
+    body: JSON.stringify({ items }),
   });
+}
+
+export async function getAnalysis(analysisId) {
+  return request(`/analyses/${encodeURIComponent(analysisId)}`);
+}
+
+export async function listAnalyses() {
+  return request("/analyses");
+}
+
+export async function deleteAnalysis(analysisId) {
+  return request(`/analyses/${encodeURIComponent(analysisId)}`, { method: "DELETE" });
 }

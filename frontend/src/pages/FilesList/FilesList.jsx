@@ -73,64 +73,34 @@ export default function FilesList() {
     setSelected(new Set(files.map((f) => f.name)));
   };
 
-  const onAnalyzeOne = async (name) => {
-    setBusy(true);
-    try {
-      const per = paramsMap[name] || params;
-      const res = await analyzeFiles([name], per);
-      const first = res?.results?.[0]?.profile?.fit;
-      if (first) {
-        const payload = [{ name, profile: res.results[0].profile }];
-        localStorage.setItem("analysis_results", JSON.stringify(payload));
-        localStorage.setItem("analysis_params", JSON.stringify(params));
-        localStorage.setItem("analysis_params_map", JSON.stringify(paramsMap));
-        localStorage.setItem("analysis_colors_map", JSON.stringify(colorsMap));
-        localStorage.setItem("analysis_default_color", defaultColor);
-        window.open("/analysis", "_blank", "noopener,noreferrer");
-        setToast({
-          message: `Analyzed ${name}. A0=${first.A0.toFixed(3)}, S0=${first.S0.toFixed(
-            3,
-          )}, slope=${first.AS_slope.toFixed(3)}, R²=${first.r2.toFixed(3)}`,
-          type: "success",
-        });
-      } else {
-        setToast({ message: `Analyzed ${name}.`, type: "success" });
-      }
-    } catch (e) {
-      setToast({ message: String(e.message || e), type: "error" });
-    } finally {
-      setBusy(false);
-    }
+  const persistAnalysisSettings = () => {
+    localStorage.setItem("analysis_params", JSON.stringify(params));
+    localStorage.setItem("analysis_params_map", JSON.stringify(paramsMap));
+    localStorage.setItem("analysis_colors_map", JSON.stringify(colorsMap));
+    localStorage.setItem("analysis_default_color", defaultColor);
   };
 
-  const onAnalyzeSelected = async () => {
-    if (!selected.size) return;
+  const analyze = async (names) => {
+    if (!names.length) return;
     setBusy(true);
     try {
-      const names = [...selected];
-      const updates = await Promise.all(
-        names.map(async (n) => {
-          const per = paramsMap[n] || params;
-          const res = await analyzeFiles([n], per);
-          const first = res?.results?.[0];
-          if (first?.profile) return { name: n, profile: first.profile };
-          return null;
-        }),
+      const res = await analyzeFiles(
+        names.map((name) => ({
+          name,
+          params: paramsMap[name] || params,
+        })),
       );
-      const okResults = updates.filter(Boolean);
-      const ok = okResults.length;
-      if (okResults[0]) {
-        const payload = okResults.map((r) => ({ name: r.name, profile: r.profile }));
-        localStorage.setItem("analysis_results", JSON.stringify(payload));
-        localStorage.setItem("analysis_params", JSON.stringify(params));
-        localStorage.setItem("analysis_params_map", JSON.stringify(paramsMap));
-        localStorage.setItem("analysis_colors_map", JSON.stringify(colorsMap));
-        localStorage.setItem("analysis_default_color", defaultColor);
-        window.open("/analysis", "_blank", "noopener,noreferrer");
+      const okResults = Array.isArray(res?.results)
+        ? res.results.filter((item) => item?.profile)
+        : [];
+      if (okResults[0] && res?.analysis_id) {
+        persistAnalysisSettings();
+        window.open(`/analyses/${encodeURIComponent(res.analysis_id)}`, "_blank");
       }
+      const ok = okResults.length;
       setToast({
-        message: `Analyzed ${ok}/${selected.size} file(s): ${[...selected].slice(0, 3).join(", ")}${
-          selected.size > 3 ? "…" : ""
+        message: `Analyzed ${ok}/${names.length} file(s): ${names.slice(0, 3).join(", ")}${
+          names.length > 3 ? "…" : ""
         }`,
         type: ok ? "success" : "error",
       });
@@ -222,7 +192,7 @@ export default function FilesList() {
           </div>
           <button
             className={styles.primaryBtn}
-            onClick={onAnalyzeSelected}
+            onClick={() => analyze([...selected])}
             disabled={!selected.size || busy}
             type="button"
           >
@@ -258,7 +228,7 @@ export default function FilesList() {
                 <div className={styles.cellActions}>
                   <button
                     className={styles.linkPrimary}
-                    onClick={() => onAnalyzeOne(f.name)}
+                    onClick={() => analyze([f.name])}
                     disabled={busy}
                     type="button"
                   >

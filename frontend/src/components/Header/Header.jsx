@@ -30,10 +30,10 @@ export default function Header() {
             Files List
           </NavLink>
           <NavLink
-            to="/analysis"
+            to="/analyses"
             className={({ isActive }) => `${styles.tab} ${isActive ? styles.active : ""}`}
           >
-            Analysis
+            Saved Analyses
           </NavLink>
         </nav>
       </div>
