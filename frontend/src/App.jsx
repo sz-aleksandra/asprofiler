@@ -1,7 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout/Layout";
 import About from "./pages/About/About";
-import AnalysesList from "./pages/AnalysesList/AnalysesList";
 import Analysis from "./pages/Analysis/Analysis";
 import FilesList from "./pages/FilesList/FilesList";
 
@@ -11,9 +10,10 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/about" replace />} />
         <Route path="/about" element={<About />} />
-        <Route path="/analyses" element={<AnalysesList />} />
-        <Route path="/analyses/:analysisId" element={<Analysis />} />
         <Route path="/files" element={<FilesList />} />
+        <Route path="/analysis" element={<Analysis />} />
+        <Route path="/analyses" element={<Navigate to="/files" replace />} />
+        <Route path="/analyses/:analysisId" element={<Navigate to="/files" replace />} />
       </Route>
     </Routes>
   );

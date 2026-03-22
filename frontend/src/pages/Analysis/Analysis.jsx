@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import { useAnalysisLayout } from "../../components/Layout/AnalysisLayoutContext";
-import { getAnalysis } from "../../services/filesApi";
 import { getCssVar } from "../../utils/getCssVar";
 import { hexToRgba } from "../../utils/hexToRgba";
 import AnalysisReport from "./AnalysisReport";
@@ -11,33 +10,19 @@ import AnalysisToolbar from "./AnalysisToolbar";
 import styles from "./Analysis.module.css";
 
 export default function Analysis() {
-  const { analysisId } = useParams();
+  const location = useLocation();
   const { analysisToolsOpen: toolsOpen, setAnalysisToolsOpen: setToolsOpen } = useAnalysisLayout();
-
-  const [fetchedAnalysis, setFetchedAnalysis] = useState(null);
-
-  useEffect(() => {
-    if (!analysisId) return undefined;
-
-    getAnalysis(analysisId)
-      .then((payload) => {
-        setFetchedAnalysis(payload || {});
-      })
-      .catch(() => {
-        setFetchedAnalysis({ results: [] });
-      });
-  }, [analysisId]);
 
   useEffect(() => () => setToolsOpen(false), [setToolsOpen]);
 
+  const analysisState = location.state || {};
   const results = useMemo(
-    () => (Array.isArray(fetchedAnalysis?.results) ? fetchedAnalysis.results : []),
-    [fetchedAnalysis],
+    () => (Array.isArray(analysisState?.results) ? analysisState.results : []),
+    [analysisState],
   );
-  const loadingAnalysis = Boolean(analysisId) && fetchedAnalysis === null;
 
   const [colors, setColors] = useState({});
-  const savedColors = useMemo(() => fetchedAnalysis?.color_map || {}, [fetchedAnalysis]);
+  const savedColors = useMemo(() => analysisState?.color_map || {}, [analysisState]);
   const defaultColor = getCssVar("--red");
   const colorMap = useMemo(
     () =>
@@ -381,15 +366,6 @@ export default function Analysis() {
   const allPointsMarked =
     visibleSelectedPoints.length > 0 &&
     visibleSelectedPoints.every((p) => Boolean(markedPointMap[pointKey(p)]));
-
-  if (loadingAnalysis) {
-    return (
-      <section className={styles.page}>
-        <h1 className={styles.title}>Analysis</h1>
-        <p>Loading analysis...</p>
-      </section>
-    );
-  }
 
   if (results.length === 0) {
     return (

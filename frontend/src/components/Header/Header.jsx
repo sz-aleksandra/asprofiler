@@ -5,7 +5,7 @@ import styles from "./Header.module.css";
 
 export default function Header() {
   const location = useLocation();
-  const showToolbarButton = /^\/analyses\/[^/]+$/.test(location.pathname);
+  const showToolbarButton = location.pathname === "/analysis";
   const { analysisToolsOpen, setAnalysisToolsOpen } = useAnalysisLayout();
   const toolbarOpen = showToolbarButton && analysisToolsOpen;
 
@@ -35,12 +35,6 @@ export default function Header() {
             className={({ isActive }) => `${styles.tab} ${isActive ? styles.active : ""}`}
           >
             Files
-          </NavLink>
-          <NavLink
-            to="/analyses"
-            className={({ isActive }) => `${styles.tab} ${isActive ? styles.active : ""}`}
-          >
-            Analyses
           </NavLink>
         </nav>
 

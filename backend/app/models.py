@@ -29,3 +29,8 @@ class FileInfo(BaseModel):
 
 class DeleteRequest(BaseModel):
     names: List[str]
+
+
+class AnalyzeResultsResponse(BaseModel):
+    ok: bool = True
+    results: list[dict]

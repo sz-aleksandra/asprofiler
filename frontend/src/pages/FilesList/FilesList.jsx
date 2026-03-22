@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import Dropzone from "../../components/Dropzone/Dropzone";
 import Toast from "../../components/Toast/Toast";
 
-import { analyzeFiles, deleteFiles, listFiles, uploadFiles } from "../../services/filesApi";
+import { analyzeFiles } from "../../services/filesApi";
 import { formatBytes } from "../../utils/formatBytes";
 import { getCssVar } from "../../utils/getCssVar";
 import { normalizeGpsCsvFile } from "../../utils/normalizeGpsCsv";
@@ -17,9 +18,8 @@ const DEFAULT_PARAMS = {
 };
 
 export default function FilesList() {
-  const [files, setFiles] = useState([]);
+  const navigate = useNavigate();
   const [pendingFiles, setPendingFiles] = useState([]);
-  const [pendingSelected, setPendingSelected] = useState(() => new Set());
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState({ message: "", type: "info" });
@@ -57,19 +57,6 @@ export default function FilesList() {
 
   const closeToast = () => setToast({ message: "", type: "info" });
 
-  const refresh = async () => {
-    const data = await listFiles();
-    setFiles(data);
-    setSelected((prev) => {
-      const existing = new Set(data.map((x) => x.name));
-      return new Set([...prev].filter((n) => existing.has(n)));
-    });
-  };
-
-  useEffect(() => {
-    refresh().catch((e) => setToast({ message: String(e.message || e), type: "error" }));
-  }, []);
-
   const onToggleOne = (name) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -81,21 +68,7 @@ export default function FilesList() {
 
   const onToggleAll = (value) => {
     if (!value) return setSelected(new Set());
-    setSelected(new Set(files.map((f) => f.name)));
-  };
-
-  const onPendingToggleOne = (name) => {
-    setPendingSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-  };
-
-  const onPendingToggleAll = (value) => {
-    if (!value) return setPendingSelected(new Set());
-    setPendingSelected(new Set(pendingFiles.map((file) => file.name)));
+    return setSelected(new Set(pendingFiles.map((file) => file.name)));
   };
 
   const onFiles = (picked) => {
@@ -108,65 +81,19 @@ export default function FilesList() {
     });
   };
 
-  const onRemovePendingOne = (name) => {
+  const onRemoveOne = (name) => {
     setPendingFiles((prev) => prev.filter((file) => file.name !== name));
-    setPendingSelected((prev) => {
+    setSelected((prev) => {
       const next = new Set(prev);
       next.delete(name);
       return next;
     });
   };
 
-  const onRemovePendingSelected = () => {
-    if (!pendingSelected.size) return;
-    setPendingFiles((prev) => prev.filter((file) => !pendingSelected.has(file.name)));
-    setPendingSelected(new Set());
-  };
-
-  const onUploadSelected = async () => {
-    if (!pendingSelected.size) return;
-    const filesToUpload = pendingFiles.filter((file) => pendingSelected.has(file.name));
-    setBusy(true);
-    try {
-      const processed = await Promise.all(
-        filesToUpload.map(async (file) => {
-          try {
-            const normalized = await normalizeGpsCsvFile(file);
-            return { name: file.name, file: normalized };
-          } catch (error) {
-            return { name: file.name, error: String(error.message || error) };
-          }
-        }),
-      );
-      const readyToUpload = processed.filter((item) => item.file).map((item) => item.file);
-      const failed = processed.filter((item) => item.error);
-
-      if (!readyToUpload.length) {
-        throw new Error(
-          failed.map((item) => `${item.name} (${item.error})`).join(", ") ||
-            "No files could be preprocessed",
-        );
-      }
-
-      await uploadFiles(readyToUpload);
-      await refresh();
-      const uploadedNames = new Set(readyToUpload.map((file) => file.name));
-      setPendingFiles((prev) => prev.filter((file) => !uploadedNames.has(file.name)));
-      setPendingSelected(new Set(failed.map((item) => item.name)));
-      const failedMessage = failed.length
-        ? ` Failed preprocessing: ${failed
-            .map((item) => `${item.name} (${item.error})`)
-            .join(", ")}`
-        : "";
-      setToast({
-        message: `Added ${readyToUpload.length} file(s).${failedMessage}`,
-        type: failed.length ? "error" : "success",
-      });
-    } catch (e) {
-      setToast({ message: String(e.message || e), type: "error" });
-    } finally {
-      setBusy(false);
-    }
+  const onRemoveSelected = () => {
+    if (!selected.size) return;
+    setPendingFiles((prev) => prev.filter((file) => !selected.has(file.name)));
+    setSelected(new Set());
   };
 
   const persistAnalysisSettings = () => {
@@ -178,36 +105,60 @@ export default function FilesList() {
 
   const analyze = async (names) => {
     if (!names.length) return;
+    const filesToAnalyze = pendingFiles.filter((file) => names.includes(file.name));
+    if (!filesToAnalyze.length) return;
+
     setBusy(true);
     try {
-      const res = await analyzeFiles(
-        names.map((name) => ({
-          name,
-          params: { ...params, ...(paramsMap[name] || {}) },
-        })),
-        Object.fromEntries(names.map((name) => [name, colorsMap[name] || defaultColor])),
+      const processed = await Promise.all(
+        filesToAnalyze.map(async (file) => {
+          try {
+            const normalized = await normalizeGpsCsvFile(file);
+            return { name: file.name, file: normalized };
+          } catch (error) {
+            return { name: file.name, error: String(error.message || error) };
+          }
+        }),
       );
+      const readyFiles = processed.filter((item) => item.file).map((item) => item.file);
+      const failedPreprocessing = processed.filter((item) => item.error);
+
+      if (!readyFiles.length) {
+        throw new Error(
+          failedPreprocessing.map((item) => `${item.name} (${item.error})`).join(", ") ||
+            "No files could be preprocessed",
+        );
+      }
+
+      const res = await analyzeFiles(readyFiles, params, paramsMap);
       const okResults = Array.isArray(res?.results)
         ? res.results.filter((item) => item?.profile)
         : [];
-      const failedResults = Array.isArray(res?.results)
-        ? res.results.filter((item) => item?.error)
-        : [];
-      if (okResults[0] && res?.analysis_id) {
+      const failedResults = [
+        ...failedPreprocessing.map((item) => ({ name: item.name, error: item.error })),
+        ...(Array.isArray(res?.results) ? res.results.filter((item) => item?.error) : []),
+      ];
+
+      if (okResults.length) {
         persistAnalysisSettings();
-        window.open(`/analyses/${encodeURIComponent(res.analysis_id)}`, "_blank");
+        navigate("/analysis", {
+          state: {
+            results: okResults,
+            color_map: Object.fromEntries(
+              okResults.map((item) => [item.name, colorsMap[item.name] || defaultColor]),
+            ),
+          },
+        });
       }
-      const ok = okResults.length;
+
       const failedMessage = failedResults.length
-        ? ` Failed: ${failedResults
-            .map((item) => `${item.name} (${item.error})`)
-            .join(", ")}`
+        ? ` Failed: ${failedResults.map((item) => `${item.name} (${item.error})`).join(", ")}`
         : "";
       setToast({
-        message: `Analyzed ${ok}/${names.length} file(s): ${names.slice(0, 3).join(", ")}${
-          names.length > 3 ? "…" : ""
-        }.${failedMessage}`,
-        type: ok ? "success" : "error",
+        message: `Analyzed ${okResults.length}/${names.length} file(s): ${names
+          .slice(0, 3)
+          .join(", ")}${names.length > 3 ? "…" : ""}.${failedMessage}`,
+        type: okResults.length ? "success" : "error",
       });
     } catch (e) {
       setToast({ message: String(e.message || e), type: "error" });
@@ -216,116 +167,19 @@ export default function FilesList() {
     }
   };
 
-  const onDeleteOne = async (name) => {
-    setBusy(true);
-    try {
-      await deleteFiles([name]);
-      await refresh();
-      setToast({ message: `Deleted: ${name}`, type: "success" });
-    } catch (e) {
-      setToast({ message: String(e.message || e), type: "error" });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onDeleteSelected = async () => {
-    if (!selected.size) return;
-    setBusy(true);
-    try {
-      await deleteFiles([...selected]);
-      setSelected(new Set());
-      await refresh();
-      setToast({ message: "Deleted selected files.", type: "success" });
-    } catch (e) {
-      setToast({ message: String(e.message || e), type: "error" });
-    } finally {
-      setBusy(false);
-    }
-  };
+  const allSelected =
+    pendingFiles.length > 0 && pendingFiles.every((file) => selected.has(file.name));
 
   const sortedFiles = useMemo(
-    () => [...files].sort((a, b) => a.name.localeCompare(b.name)),
-    [files],
+    () => [...pendingFiles].sort((a, b) => a.name.localeCompare(b.name)),
+    [pendingFiles],
   );
-  const allPendingSelected =
-    pendingFiles.length > 0 && pendingFiles.every((file) => pendingSelected.has(file.name));
-
-  const allSelected = files.length > 0 && files.every((f) => selected.has(f.name));
 
   return (
     <section className={styles.page}>
       <h1 className={styles.title}>Files</h1>
 
       <Dropzone onFiles={onFiles} />
-
-      <div className={styles.inlineTable}>
-        <div className={styles.toolbar}>
-          <div className={styles.toolbarLeft}>
-            <label className={styles.selectAll}>
-              <input
-                type="checkbox"
-                checked={allPendingSelected}
-                onChange={() => onPendingToggleAll(!allPendingSelected)}
-                disabled={!pendingFiles.length || busy}
-              />
-              <span>Select all</span>
-            </label>
-            <span className={styles.count}>
-              {pendingFiles.length} files to upload · {pendingSelected.size} selected
-            </span>
-          </div>
-          <div className={styles.actionsGroup}>
-            <button
-              className={styles.primaryBtn}
-              onClick={onUploadSelected}
-              disabled={!pendingSelected.size || busy}
-              type="button"
-            >
-              Upload selected
-            </button>
-            <button
-              className={styles.dangerBtn}
-              onClick={onRemovePendingSelected}
-              disabled={!pendingSelected.size || busy}
-              type="button"
-            >
-              Remove selected
-            </button>
-          </div>
-        </div>
-        <div className={`${styles.row} ${styles.head}`}>
-          <div className={styles.cellCheckbox}></div>
-          <div className={styles.cellName}>Filename</div>
-          <div className={styles.cellSize}>Size</div>
-          <div className={styles.cellActions}></div>
-        </div>
-        {pendingFiles.map((file) => (
-          <div className={styles.row} key={file.name}>
-            <div className={styles.cellCheckbox}>
-              <input
-                type="checkbox"
-                checked={pendingSelected.has(file.name)}
-                onChange={() => onPendingToggleOne(file.name)}
-                disabled={busy}
-              />
-            </div>
-            <div className={styles.cellName}>{file.name}</div>
-            <div className={styles.cellSize}>{formatBytes(file.size)}</div>
-            <div className={styles.cellActions}>
-              <button
-                className={styles.linkDanger}
-                onClick={() => onRemovePendingOne(file.name)}
-                disabled={busy}
-                type="button"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ))}
-        {!pendingFiles.length && <div className={styles.emptyRow}>No files selected for upload.</div>}
-      </div>
 
       <div className={styles.controls}>
         <div className={styles.sectionTitle}>Analysis preset</div>
@@ -387,12 +241,12 @@ export default function FilesList() {
                 type="checkbox"
                 checked={allSelected}
                 onChange={() => onToggleAll(!allSelected)}
-                disabled={!files.length || busy}
+                disabled={!pendingFiles.length || busy}
               />
               <span>Select all</span>
             </label>
             <span className={styles.count}>
-              {files.length} uploaded files · {selected.size} selected
+              {pendingFiles.length} files ready for analysis · {selected.size} selected
             </span>
           </div>
           <div className={styles.actionsGroup}>
@@ -406,11 +260,11 @@ export default function FilesList() {
             </button>
             <button
               className={styles.dangerBtn}
-              onClick={onDeleteSelected}
+              onClick={onRemoveSelected}
               disabled={!selected.size || busy}
               type="button"
             >
-              Delete selected
+              Remove selected
             </button>
           </div>
         </div>
@@ -420,26 +274,26 @@ export default function FilesList() {
           <div className={styles.cellSize}>Size</div>
           <div className={styles.cellActions}></div>
         </div>
-        {sortedFiles.map((f) => {
-          const checked = selected.has(f.name);
-          const perParams = { ...params, ...(paramsMap[f.name] || {}) };
+        {sortedFiles.map((file) => {
+          const checked = selected.has(file.name);
+          const perParams = { ...params, ...(paramsMap[file.name] || {}) };
           return (
-            <div key={f.name} className={styles.fileBlock}>
+            <div key={file.name} className={styles.fileBlock}>
               <div className={`${styles.row} ${checked ? styles.rowExpanded : ""}`}>
                 <div className={styles.cellCheckbox}>
                   <input
                     type="checkbox"
                     checked={checked}
-                    onChange={() => onToggleOne(f.name)}
+                    onChange={() => onToggleOne(file.name)}
                     disabled={busy}
                   />
                 </div>
-                <div className={styles.cellName}>{f.name}</div>
-                <div className={styles.cellSize}>{formatBytes(f.size)}</div>
+                <div className={styles.cellName}>{file.name}</div>
+                <div className={styles.cellSize}>{formatBytes(file.size)}</div>
                 <div className={styles.cellActions}>
                   <button
                     className={styles.linkPrimary}
-                    onClick={() => analyze([f.name])}
+                    onClick={() => analyze([file.name])}
                     disabled={busy}
                     type="button"
                   >
@@ -447,11 +301,11 @@ export default function FilesList() {
                   </button>
                   <button
                     className={styles.linkDanger}
-                    onClick={() => onDeleteOne(f.name)}
+                    onClick={() => onRemoveOne(file.name)}
                     disabled={busy}
                     type="button"
                   >
-                    Delete
+                    Remove
                   </button>
                 </div>
               </div>
@@ -462,9 +316,9 @@ export default function FilesList() {
                     <input
                       className={styles.colorInput}
                       type="color"
-                      value={colorsMap[f.name] || defaultColor}
+                      value={colorsMap[file.name] || defaultColor}
                       onChange={(e) => {
-                        const next = { ...colorsMap, [f.name]: e.target.value };
+                        const next = { ...colorsMap, [file.name]: e.target.value };
                         setColorsMap(next);
                         localStorage.setItem("analysis_colors_map", JSON.stringify(next));
                       }}
@@ -481,7 +335,7 @@ export default function FilesList() {
                       onChange={(e) => {
                         const next = {
                           ...paramsMap,
-                          [f.name]: { ...perParams, min_speed: Number(e.target.value) },
+                          [file.name]: { ...perParams, min_speed: Number(e.target.value) },
                         };
                         setParamsMap(next);
                         localStorage.setItem("analysis_params_map", JSON.stringify(next));
@@ -499,7 +353,7 @@ export default function FilesList() {
                       onChange={(e) => {
                         const next = {
                           ...paramsMap,
-                          [f.name]: { ...perParams, bin_size: Number(e.target.value) },
+                          [file.name]: { ...perParams, bin_size: Number(e.target.value) },
                         };
                         setParamsMap(next);
                         localStorage.setItem("analysis_params_map", JSON.stringify(next));
@@ -517,7 +371,7 @@ export default function FilesList() {
                       onChange={(e) => {
                         const next = {
                           ...paramsMap,
-                          [f.name]: { ...perParams, ci_z: Number(e.target.value) },
+                          [file.name]: { ...perParams, ci_z: Number(e.target.value) },
                         };
                         setParamsMap(next);
                         localStorage.setItem("analysis_params_map", JSON.stringify(next));
@@ -530,7 +384,7 @@ export default function FilesList() {
             </div>
           );
         })}
-        {!sortedFiles.length && <div className={styles.emptyRow}>No files available.</div>}
+        {!sortedFiles.length && <div className={styles.emptyRow}>No files selected yet.</div>}
       </div>
 
       <Toast message={toast.message} type={toast.type} onClose={closeToast} />

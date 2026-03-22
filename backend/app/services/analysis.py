@@ -11,58 +11,64 @@ from app.models import AnalyzeParams
 def load_series(
     path: Path,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None, int]:
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        return load_series_stream(f)
+
+
+def load_series_stream(
+    stream,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None, int]:
     speeds = []
     accels = []
     times = []
     hearts = []
     has_heart = False
     total_rows = 0
-    with path.open("r", encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        if reader.fieldnames is None:
-            raise HTTPException(status_code=400, detail="Missing CSV header")
-        field_map = {name.strip().lower(): name for name in reader.fieldnames}
-        if (
-            "time" not in field_map
-            or "speed" not in field_map
-            or "acceleration" not in field_map
-        ):
-            raise HTTPException(
-                status_code=400,
-                detail="CSV must contain time, speed, acceleration columns",
-            )
-        time_col = field_map["time"]
-        speed_col = field_map["speed"]
-        accel_col = field_map["acceleration"]
-        heart_col = field_map.get("heartrate")
-        for row in reader:
-            total_rows += 1
+    reader = csv.DictReader(stream)
+    if reader.fieldnames is None:
+        raise HTTPException(status_code=400, detail="Missing CSV header")
+    field_map = {name.strip().lower(): name for name in reader.fieldnames}
+    if (
+        "time" not in field_map
+        or "speed" not in field_map
+        or "acceleration" not in field_map
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="CSV must contain time, speed, acceleration columns",
+        )
+    time_col = field_map["time"]
+    speed_col = field_map["speed"]
+    accel_col = field_map["acceleration"]
+    heart_col = field_map.get("heartrate")
+    for row in reader:
+        total_rows += 1
+        try:
+            t_raw = row.get(time_col, "")
+            s_raw = row.get(speed_col, "")
+            a_raw = row.get(accel_col, "")
+            if t_raw is None or s_raw is None or a_raw is None:
+                continue
+            t = float(str(t_raw).strip())
+            s = float(str(s_raw).strip())
+            a = float(str(a_raw).strip())
+        except (ValueError, TypeError):
+            continue
+        if math.isnan(t) or math.isnan(s) or math.isnan(a):
+            continue
+        speeds.append(s)
+        accels.append(a)
+        times.append(t)
+        if heart_col:
+            h_raw = row.get(heart_col, "")
             try:
-                t_raw = row.get(time_col, "")
-                s_raw = row.get(speed_col, "")
-                a_raw = row.get(accel_col, "")
-                if t_raw is None or s_raw is None or a_raw is None:
-                    continue
-                t = float(str(t_raw).strip())
-                s = float(str(s_raw).strip())
-                a = float(str(a_raw).strip())
-            except (ValueError, TypeError):
-                continue
-            if math.isnan(t) or math.isnan(s) or math.isnan(a):
-                continue
-            speeds.append(s)
-            accels.append(a)
-            times.append(t)
-            if heart_col:
-                h_raw = row.get(heart_col, "")
-                try:
-                    if h_raw is None or str(h_raw).strip() == "":
-                        hearts.append(float("nan"))
-                    else:
-                        hearts.append(float(str(h_raw).strip()))
-                        has_heart = True
-                except (ValueError, TypeError):
+                if h_raw is None or str(h_raw).strip() == "":
                     hearts.append(float("nan"))
+                else:
+                    hearts.append(float(str(h_raw).strip()))
+                    has_heart = True
+            except (ValueError, TypeError):
+                hearts.append(float("nan"))
 
     if not speeds:
         raise HTTPException(status_code=400, detail="No valid speed/accel rows found")
