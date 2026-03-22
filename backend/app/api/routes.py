@@ -71,7 +71,7 @@ def analyze(req: AnalyzeRequest):
         except HTTPException as e:
             results.append({"name": safe, "error": str(e.detail)})
 
-    analysis_id = save_analysis(results)
+    analysis_id = save_analysis(results, req.color_map)
     return {"ok": True, "analysis_id": analysis_id, "results": results}
 
 

@@ -213,11 +213,12 @@ def build_as_profile(
 
     y_hat = intercept + slope * x
     r2 = _r2(y, y_hat)
-
     s0 = float(-intercept / slope) if slope != 0 else float("inf")
+
     heart_arr = None
     if hearts is not None:
         heart_arr = hearts[~np.isnan(hearts)]
+
     return {
         "all_points": [
             {"speed": float(xs), "accel": float(ys)}
@@ -232,10 +233,16 @@ def build_as_profile(
             for xs, ys in zip(x.tolist(), y.tolist())
         ],
         "fit": {
+            "model": "linear",
+            "label": "Linear regression",
             "A0": float(intercept),
             "AS_slope": float(slope),
             "S0": s0,
             "r2": float(r2),
+            "curve": [
+                {"speed": 0.0, "accel": float(intercept)},
+                {"speed": float(s0), "accel": 0.0},
+            ],
         },
         "timeseries": {
             "time": times.tolist(),

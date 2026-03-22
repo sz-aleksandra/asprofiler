@@ -87,6 +87,12 @@
   gap: 14px;
 }
 
+.actionsGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .selectAll {
   display: flex;
   align-items: center;
@@ -122,6 +128,28 @@
   background: white;
   color: red;
   border: 1px solid red;
+}
+
+.dangerBtn {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--white);
+  background: var(--red);
+  color: var(--white);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dangerBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.dangerBtn:hover {
+  background: red;
+  color: white;
+  border: 1px solid white;
 }
 
 .row {
@@ -163,6 +191,7 @@
 .cellActions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
 }
 
 .linkPrimary {
@@ -185,6 +214,28 @@
   background: white;
   color: red;
   border: 1px solid red;
+}
+
+.linkDanger {
+  background: var(--red);
+  border: 1px solid var(--white);
+  border-radius: 6px;
+  color: var(--white);
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkDanger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.linkDanger:hover {
+  background: red;
+  color: white;
+  border: 1px solid white;
 }
 
 .emptyRow {

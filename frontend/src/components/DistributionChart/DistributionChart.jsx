@@ -15,6 +15,7 @@ export default function DistributionChart({
 }) {
   const containerRef = useRef(null);
   const cssBlack = getCssVar("--black");
+  const cssRed = getCssVar("--red");
 
   const plotData = useMemo(() => {
     if (!Array.isArray(traces) || !traces.length) return null;
@@ -48,10 +49,10 @@ export default function DistributionChart({
           cmax: Number.isFinite(Number(heatmapTrace.zmax)) ? Number(heatmapTrace.zmax) : 1,
           colorscale: [
             [0, "#ffffff"],
-            [0.12, hexToRgba(heatmapTrace.baseColor, 0.18)],
-            [0.3, hexToRgba(heatmapTrace.baseColor, 0.35)],
-            [0.6, hexToRgba(heatmapTrace.baseColor, 0.65)],
-            [1, heatmapTrace.baseColor],
+            [0.12, hexToRgba(cssRed, 0.18)],
+            [0.3, hexToRgba(cssRed, 0.35)],
+            [0.6, hexToRgba(cssRed, 0.65)],
+            [1, cssRed],
           ],
           colorbar: {
             title: { text: "Count" },
@@ -79,7 +80,7 @@ export default function DistributionChart({
     const ro = new ResizeObserver(() => Plotly.Plots.resize(node));
     ro.observe(node);
     return () => ro.disconnect();
-  }, [plotData, title, cssBlack, showLegend, violinMode, xAxis, yAxis]);
+  }, [plotData, title, cssBlack, cssRed, showLegend, violinMode, xAxis, yAxis]);
 
   if (!plotData) return null;
 

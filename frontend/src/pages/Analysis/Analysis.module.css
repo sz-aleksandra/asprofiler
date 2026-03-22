@@ -10,6 +10,79 @@
   color: var(--black);
 }
 
+.drawerBackdropOpen {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.08);
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 20;
+  animation: fadeInBackdrop 0.18s ease;
+}
+
+.toolsDrawerOpen {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(50vw, 900px);
+  min-width: 640px;
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--black);
+  color: var(--white);
+  border-left: 1px solid var(--white);
+  z-index: 30;
+  animation: slideInToolbar 0.2s ease;
+}
+
+@keyframes slideInToolbar {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInBackdrop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.toolsDrawerOpen .toolbar,
+.toolsDrawerOpen .table,
+.toolsDrawerOpen .selectionTable,
+.toolsDrawerOpen .row,
+.toolsDrawerOpen .selectionEmpty {
+  border-color: var(--white);
+}
+
+.toolsDrawerOpen .head,
+.toolsDrawerOpen .count,
+.toolsDrawerOpen .selectAll,
+.toolsDrawerOpen .cellFit,
+.toolsDrawerOpen .cellMetric,
+.toolsDrawerOpen .selectionLabel,
+.toolsDrawerOpen .selectionCol,
+.toolsDrawerOpen .selectionSortBtn,
+.toolsDrawerOpen .selectionFile,
+.toolsDrawerOpen .selectionEmpty,
+.toolsDrawerOpen .cellCheckbox,
+.toolsDrawerOpen .cellName {
+  color: var(--white);
+}
+
+.toolsDrawerOpen .colorInput,
+.toolsDrawerOpen .selectionInput {
+  border-color: var(--white);
+  background: var(--white);
+  color: var(--black);
+}
+
 .controls {
   padding: 0;
   border-radius: 0;
@@ -19,6 +92,17 @@
   flex-direction: column;
   gap: 0;
   margin-top: 14px;
+}
+
+.drawerSection {
+  display: flex;
+  flex-direction: column;
+}
+
+.drawerSectionTitle {
+  padding: 12px 14px;
+  font-weight: 600;
+  color: var(--white);
 }
 
 .toolbar {
@@ -138,6 +222,45 @@
   gap: 14px;
 }
 
+.reportTable {
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.reportRow {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.6fr) repeat(4, minmax(140px, 1fr));
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--black);
+  background: transparent;
+}
+
+.toolbarFilesRow {
+  grid-template-columns: 44px minmax(0, 1fr) 72px;
+}
+
+.reportRow:last-child {
+  border-bottom: none;
+}
+
+.reportCellName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.reportCellModel,
+.reportCellFit,
+.reportCellMetric {
+  color: var(--black);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
 .statsCard {
   border: none;
   border-radius: 16px;
@@ -166,6 +289,14 @@
 .statsLabel {
   font-weight: 600;
   color: var(--black);
+}
+
+.statsFileName {
+  font-weight: 400;
+}
+
+.statsMetricName {
+  font-weight: 600;
 }
 
 .statsValue {
@@ -211,6 +342,7 @@
 
 .selectionSortBtn {
   border: none;
+  background: transparent;
   color: var(--black);
   font: inherit;
   text-align: left;

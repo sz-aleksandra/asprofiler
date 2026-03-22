@@ -19,6 +19,7 @@ class AnalyzeItemRequest(BaseModel):
 
 class AnalyzeRequest(BaseModel):
     items: List[AnalyzeItemRequest]
+    color_map: dict[str, str] = {}
 
 
 class FileInfo(BaseModel):

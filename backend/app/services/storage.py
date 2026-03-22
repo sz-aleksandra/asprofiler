@@ -91,13 +91,17 @@ def cleanup_expired_analyses() -> list[str]:
     return removed
 
 
-def save_analysis(results: list[dict]) -> str:
+def save_analysis(
+    results: list[dict],
+    color_map: dict[str, str] | None = None,
+) -> str:
     analysis_id = str(uuid4())
     target = ANALYSIS_DIR / f"{analysis_id}.json"
     payload = {
         "analysis_id": analysis_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "results": results,
+        "color_map": color_map or {},
     }
     target.write_text(json.dumps(payload), encoding="utf-8")
     return analysis_id

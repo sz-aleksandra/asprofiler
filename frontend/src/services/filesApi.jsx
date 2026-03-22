@@ -29,11 +29,11 @@ export async function deleteFiles(names) {
   });
 }
 
-export async function analyzeFiles(items) {
+export async function analyzeFiles(items, colorMap) {
   return request("/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ items }),
+    body: JSON.stringify({ items, color_map: colorMap }),
   });
 }
 

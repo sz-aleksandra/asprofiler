@@ -10,7 +10,12 @@
   padding: 16px 24px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 20px;
+  transition: padding-right 0.2s ease;
+}
+
+.innerShifted {
+  padding-right: 50vw;
 }
 
 .brand {
@@ -25,6 +30,7 @@
 .tabs {
   display: flex;
   gap: 12px;
+  margin-right: auto;
 }
 
 .tab {
@@ -52,4 +58,38 @@
   background: white;
   border: solid 1px black;
   color: black;
+}
+
+.toolbarBtn {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--red);
+  background: var(--white);
+  color: var(--red);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toolbarBtn:hover {
+  background: white;
+  border: 1px solid red;
+  color: red;
+}
+
+.toolbarBtnActive {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--white);
+  background: var(--red);
+  color: var(--white);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toolbarBtnActive:hover {
+  background: red;
+  border: 1px solid white;
+  color: white;
 }

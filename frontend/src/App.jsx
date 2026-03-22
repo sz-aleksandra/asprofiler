@@ -4,7 +4,6 @@ import About from "./pages/About/About";
 import AnalysesList from "./pages/AnalysesList/AnalysesList";
 import Analysis from "./pages/Analysis/Analysis";
 import FilesList from "./pages/FilesList/FilesList";
-import UploadFiles from "./pages/FilesUpload/FilesUpload";
 
 export default function App() {
   return (
@@ -15,7 +14,6 @@ export default function App() {
         <Route path="/analyses" element={<AnalysesList />} />
         <Route path="/analyses/:analysisId" element={<Analysis />} />
         <Route path="/files" element={<FilesList />} />
-        <Route path="/upload" element={<UploadFiles />} />
       </Route>
     </Routes>
   );

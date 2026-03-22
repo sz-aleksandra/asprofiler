@@ -1,10 +1,23 @@
-import { NavLink } from "react-router-dom";
+import { useEffect } from "react";
+import { NavLink, useLocation } from "react-router-dom";
+import { useAnalysisLayout } from "../Layout/AnalysisLayoutContext";
 import styles from "./Header.module.css";
 
 export default function Header() {
+  const location = useLocation();
+  const showToolbarButton = /^\/analyses\/[^/]+$/.test(location.pathname);
+  const { analysisToolsOpen, setAnalysisToolsOpen } = useAnalysisLayout();
+  const toolbarOpen = showToolbarButton && analysisToolsOpen;
+
+  useEffect(() => {
+    if (!showToolbarButton) setAnalysisToolsOpen(false);
+  }, [showToolbarButton, setAnalysisToolsOpen]);
+
   return (
     <header className={styles.header}>
-      <div className={styles.inner}>
+      <div
+        className={`${styles.inner} ${toolbarOpen && showToolbarButton ? styles.innerShifted : ""}`}
+      >
         <div className={styles.brand}>
           <span className={styles.accent}>AS</span>
           Profiler
@@ -18,24 +31,28 @@ export default function Header() {
             About
           </NavLink>
           <NavLink
-            to="/upload"
-            className={({ isActive }) => `${styles.tab} ${isActive ? styles.active : ""}`}
-          >
-            Upload Files
-          </NavLink>
-          <NavLink
             to="/files"
             className={({ isActive }) => `${styles.tab} ${isActive ? styles.active : ""}`}
           >
-            Files List
+            Files
           </NavLink>
           <NavLink
             to="/analyses"
             className={({ isActive }) => `${styles.tab} ${isActive ? styles.active : ""}`}
           >
-            Saved Analyses
+            Analyses
           </NavLink>
         </nav>
+
+        {showToolbarButton && (
+          <button
+            className={toolbarOpen ? styles.toolbarBtnActive : styles.toolbarBtn}
+            type="button"
+            onClick={() => setAnalysisToolsOpen((open) => !open)}
+          >
+            Toolbar
+          </button>
+        )}
       </div>
     </header>
   );

@@ -141,19 +141,13 @@ export default function AspChart({
       });
 
       if (sortedAll.length) {
-        const localMin = sortedAll[0].speed;
-        const localMax = sortedAll[sortedAll.length - 1].speed;
-        const s0 = Number(profile?.fit?.S0);
-        const fitMin = Math.min(...[localMin, 0, Number.isFinite(s0) ? s0 : localMin]);
-        const fitMax = Math.max(...[localMax, 0, Number.isFinite(s0) ? s0 : localMax]);
-        const fitX = [fitMin, fitMax];
-        const fitY = fitX.map((x) => profile.fit.A0 + profile.fit.AS_slope * x);
+        const fitCurve = profile.fit.curve;
         allTraces.push({
           name: `${item.name} fit`,
           type: "scatter",
           mode: "lines",
-          x: fitX,
-          y: fitY,
+          x: fitCurve.map((point) => Number(point.speed)),
+          y: fitCurve.map((point) => Number(point.accel)),
           line: { color: base, width: 2 },
           showlegend: true,
         });
