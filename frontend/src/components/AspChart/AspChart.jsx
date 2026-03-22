@@ -26,11 +26,20 @@ export default function AspChart({
 
     const allTraces = [];
     const shapes = [];
-    const globalMinSpeed = Math.min(...valid.map((v) => Number(v.profile?.meta?.min_speed ?? 0)));
     const maxSpeedCandidates = valid.flatMap((v) => v.profile?.timeseries?.speed || []);
     const maxAccelCandidates = valid.flatMap((v) => v.profile?.timeseries?.acceleration || []);
-    const globalMaxSpeed = maxSpeedCandidates.length ? Math.max(...maxSpeedCandidates) : 0;
-    const globalMaxAccel = maxAccelCandidates.length ? Math.max(...maxAccelCandidates) : 0;
+    const globalMinSpeed = valid.reduce(
+      (min, item) => Math.min(min, Number(item.profile?.meta?.min_speed ?? 0)),
+      Number.POSITIVE_INFINITY,
+    );
+    const globalMaxSpeed = maxSpeedCandidates.reduce(
+      (max, value) => Math.max(max, Number(value)),
+      Number.NEGATIVE_INFINITY,
+    );
+    const globalMaxAccel = maxAccelCandidates.reduce(
+      (max, value) => Math.max(max, Number(value)),
+      Number.NEGATIVE_INFINITY,
+    );
 
     valid.forEach((item) => {
       const base = colorMap?.[item.name];
@@ -156,10 +165,10 @@ export default function AspChart({
       const selectedForFile = (selectedPoints || []).filter(
         (p) => p?.name === item.name && Number.isInteger(Number(p?.index)),
       );
-      if (selectedForFile.length > 0 && all.length > 0) {
-        const byIndex = [...all].sort((a, b) => a.index - b.index);
-        const selectedIndexSet = new Set(selectedForFile.map((p) => Number(p.index)));
-        const centers = [];
+        if (selectedForFile.length > 0 && all.length > 0) {
+          const byIndex = [...all].sort((a, b) => a.index - b.index);
+          const selectedIndexSet = new Set(selectedForFile.map((p) => Number(p.index)));
+          const centers = [];
         selectedForFile.forEach((sel) => {
           const selectedIndex = Number(sel.index);
           const rangeFrom = selectedIndex - pointWindow;
@@ -173,6 +182,7 @@ export default function AspChart({
               mode: "lines+markers",
               x: windowPoints.map((p) => p.speed),
               y: windowPoints.map((p) => p.accel),
+              customdata: windowPoints.map((p) => asCustomData(p, "context")),
               line: {
                 color: base,
                 width: 1.5,
@@ -195,6 +205,7 @@ export default function AspChart({
             mode: "markers",
             x: ordered.map((p) => p.speed),
             y: ordered.map((p) => p.accel),
+            customdata: ordered.map((p) => asCustomData(p, "selected")),
             marker: {
               size: 7,
               color: base,
@@ -222,6 +233,7 @@ export default function AspChart({
     const layout = {
       title: { text: title, font: { color: cssBlack } },
       font: { color: cssBlack },
+      uirevision: title,
       margin: { l: 50, r: 20, t: 40, b: 110 },
       xaxis: {
         title: { text: "Speed (m/s)", font: { color: cssBlack } },

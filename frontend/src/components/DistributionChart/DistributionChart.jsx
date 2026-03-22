@@ -62,6 +62,7 @@ export default function DistributionChart({
     const layout = {
       title: { text: title, font: { color: cssBlack } },
       font: { color: cssBlack },
+      uirevision: title,
       showlegend: showLegend,
       violinmode: violinMode ? "group" : undefined,
       xaxis: xAxis,

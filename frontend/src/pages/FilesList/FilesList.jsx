@@ -6,6 +6,7 @@ import Toast from "../../components/Toast/Toast";
 import { analyzeFiles, deleteFiles, listFiles, uploadFiles } from "../../services/filesApi";
 import { formatBytes } from "../../utils/formatBytes";
 import { getCssVar } from "../../utils/getCssVar";
+import { normalizeGpsCsvFile } from "../../utils/normalizeGpsCsv";
 
 import styles from "./FilesList.module.css";
 
@@ -127,11 +128,40 @@ export default function FilesList() {
     const filesToUpload = pendingFiles.filter((file) => pendingSelected.has(file.name));
     setBusy(true);
     try {
-      await uploadFiles(filesToUpload);
+      const processed = await Promise.all(
+        filesToUpload.map(async (file) => {
+          try {
+            const normalized = await normalizeGpsCsvFile(file);
+            return { name: file.name, file: normalized };
+          } catch (error) {
+            return { name: file.name, error: String(error.message || error) };
+          }
+        }),
+      );
+      const readyToUpload = processed.filter((item) => item.file).map((item) => item.file);
+      const failed = processed.filter((item) => item.error);
+
+      if (!readyToUpload.length) {
+        throw new Error(
+          failed.map((item) => `${item.name} (${item.error})`).join(", ") ||
+            "No files could be preprocessed",
+        );
+      }
+
+      await uploadFiles(readyToUpload);
       await refresh();
-      setPendingFiles((prev) => prev.filter((file) => !pendingSelected.has(file.name)));
-      setPendingSelected(new Set());
-      setToast({ message: `Added ${filesToUpload.length} file(s).`, type: "success" });
+      const uploadedNames = new Set(readyToUpload.map((file) => file.name));
+      setPendingFiles((prev) => prev.filter((file) => !uploadedNames.has(file.name)));
+      setPendingSelected(new Set(failed.map((item) => item.name)));
+      const failedMessage = failed.length
+        ? ` Failed preprocessing: ${failed
+            .map((item) => `${item.name} (${item.error})`)
+            .join(", ")}`
+        : "";
+      setToast({
+        message: `Added ${readyToUpload.length} file(s).${failedMessage}`,
+        type: failed.length ? "error" : "success",
+      });
     } catch (e) {
       setToast({ message: String(e.message || e), type: "error" });
     } finally {

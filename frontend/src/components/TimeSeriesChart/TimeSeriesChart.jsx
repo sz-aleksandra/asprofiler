@@ -152,6 +152,7 @@ export default function TimeSeriesChart({
     const layout = {
       title: { text: title, font: { color: cssBlack } },
       font: { color: cssBlack },
+      uirevision: title,
       margin: { l: 50, r: 20, t: 40, b: 110 },
       xaxis: {
         title: { text: xTitle, font: { color: cssBlack } },
