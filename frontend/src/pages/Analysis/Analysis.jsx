@@ -89,7 +89,6 @@ export default function Analysis() {
   const combinedTimeseries = useMemo(() => {
     const speedSeries = [];
     const accelerationSeries = [];
-    const heartrateSeries = [];
 
     visibleResults.forEach((item) => {
       const ts = item.profile?.timeseries;
@@ -107,12 +106,9 @@ export default function Analysis() {
           x: ts.time,
         });
       }
-      if (ts?.time?.length && ts.heartrate?.length) {
-        heartrateSeries.push({ name: seriesName, values: ts.heartrate, color, x: ts.time });
-      }
     });
 
-    return { speedSeries, accelerationSeries, heartrateSeries };
+    return { speedSeries, accelerationSeries };
   }, [visibleResults, colorMap]);
   const speedReferenceLines = useMemo(
     () =>
@@ -146,17 +142,6 @@ export default function Analysis() {
         values: stats.acceleration,
         metric: "acceleration",
       });
-    });
-    visibleResults.forEach((item) => {
-      const stats = item.profile?.stats || {};
-      if (stats.heartrate) {
-        rows.push({
-          fileName: item.name,
-          metricLabel: "Heartrate",
-          values: stats.heartrate,
-          metric: "heartrate",
-        });
-      }
     });
     return rows;
   }, [visibleResults]);
@@ -205,7 +190,6 @@ export default function Analysis() {
     return [
       buildMetricChart({ key: "acceleration", title: "Acceleration Distribution", unit: "m/s²" }),
       buildMetricChart({ key: "speed", title: "Speed Distribution", unit: "m/s" }),
-      buildMetricChart({ key: "heartrate", title: "Heartrate Distribution", unit: "bpm" }),
     ].filter(Boolean);
   }, [visibleResults, colorMap]);
 
@@ -314,8 +298,7 @@ export default function Analysis() {
   };
   const metricUnits = (metric) => {
     if (metric === "speed") return { value: "m/s", area: "m" };
-    if (metric === "acceleration") return { value: "m/s²", area: null };
-    if (metric === "heartrate") return { value: "bpm", area: null };
+    if (metric === "acceleration") return { value: "m/s²", area: "m/s" };
     return { value: "", area: null };
   };
   const xAxisTitle = "Time from start (s)";
@@ -323,7 +306,6 @@ export default function Analysis() {
   const shownCount = results.filter((r) => !hiddenMap[r.name]).length;
   const speedViolinChart = violinCharts.find((chart) => chart.key === "speed");
   const accelerationViolinChart = violinCharts.find((chart) => chart.key === "acceleration");
-  const heartrateViolinChart = violinCharts.find((chart) => chart.key === "heartrate");
   const onAspPointSelect = (point) => {
     const idx = Number(point?.index);
     const t = Number(point?.time);
@@ -429,7 +411,6 @@ export default function Analysis() {
         speedReferenceLines={speedReferenceLines}
         speedViolinChart={speedViolinChart}
         accelerationViolinChart={accelerationViolinChart}
-        heartrateViolinChart={heartrateViolinChart}
         fmt={fmt}
       />
     </section>

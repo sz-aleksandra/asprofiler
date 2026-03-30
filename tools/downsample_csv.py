@@ -6,9 +6,6 @@ from pathlib import Path
 TIME_COL = "Time"
 SPEED_COL = "Speed (m/s)"
 ACCEL_COL = "Instantaneous Acceleration Impulse"
-HEART_COL = "Heart Rate (bpm)"
-
-
 def parse_time_to_seconds(value: str) -> float:
     v = value.strip()
     if not v:
@@ -36,7 +33,7 @@ def downsample_csv(input_path: Path, output_path: Path) -> dict:
     ):
         reader = csv.DictReader(src)
         writer = csv.writer(dst)
-        writer.writerow(["time", "speed", "acceleration", "heartrate"])
+        writer.writerow(["time", "speed", "acceleration"])
 
         for row in reader:
             total_rows += 1
@@ -44,7 +41,6 @@ def downsample_csv(input_path: Path, output_path: Path) -> dict:
                 t_raw = row.get(TIME_COL, "")
                 s_raw = row.get(SPEED_COL, "")
                 a_raw = row.get(ACCEL_COL, "")
-                h_raw = row.get(HEART_COL, "")
                 t = str(t_raw).strip()
                 s = float(str(s_raw).strip())
                 a = float(str(a_raw).strip())
@@ -58,20 +54,13 @@ def downsample_csv(input_path: Path, output_path: Path) -> dict:
                 bad_rows += 1
                 continue
 
-            key = (f"{t_rel_sec:.3f}", s, a, str(h_raw).strip())
+            key = (f"{t_rel_sec:.3f}", s, a)
             if key in seen_rows:
                 skipped_dupes += 1
                 continue
             seen_rows.add(key)
 
-            hr = ""
-            try:
-                if h_raw is not None and str(h_raw).strip() != "":
-                    hr = f"{float(str(h_raw).strip()):.2f}"
-            except Exception:
-                hr = ""
-
-            writer.writerow([f"{t_rel_sec:.3f}", f"{s:.6f}", f"{a:.6f}", hr])
+            writer.writerow([f"{t_rel_sec:.3f}", f"{s:.6f}", f"{a:.6f}"])
             kept_rows += 1
 
     return {
@@ -84,7 +73,7 @@ def downsample_csv(input_path: Path, output_path: Path) -> dict:
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Normalize GPS CSV to time/speed/accel/heartrate and dedupe rows"
+        description="Normalize GPS CSV to time/speed/accel and dedupe rows"
     )
     ap.add_argument("input", help="Input CSV path")
     ap.add_argument(

@@ -10,19 +10,17 @@ from app.models import AnalyzeParams
 
 def load_series(
     path: Path,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None, int]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         return load_series_stream(f)
 
 
 def load_series_stream(
     stream,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None, int]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
     speeds = []
     accels = []
     times = []
-    hearts = []
-    has_heart = False
     total_rows = 0
     reader = csv.DictReader(stream)
     if reader.fieldnames is None:
@@ -40,7 +38,6 @@ def load_series_stream(
     time_col = field_map["time"]
     speed_col = field_map["speed"]
     accel_col = field_map["acceleration"]
-    heart_col = field_map.get("heartrate")
     for row in reader:
         total_rows += 1
         try:
@@ -59,16 +56,6 @@ def load_series_stream(
         speeds.append(s)
         accels.append(a)
         times.append(t)
-        if heart_col:
-            h_raw = row.get(heart_col, "")
-            try:
-                if h_raw is None or str(h_raw).strip() == "":
-                    hearts.append(float("nan"))
-                else:
-                    hearts.append(float(str(h_raw).strip()))
-                    has_heart = True
-            except (ValueError, TypeError):
-                hearts.append(float("nan"))
 
     if not speeds:
         raise HTTPException(status_code=400, detail="No valid speed/accel rows found")
@@ -77,7 +64,6 @@ def load_series_stream(
         np.array(times, dtype=float),
         np.array(speeds, dtype=float),
         np.array(accels, dtype=float),
-        np.array(hearts, dtype=float) if has_heart else None,
         total_rows,
     )
 
@@ -182,7 +168,6 @@ def build_as_profile(
     times: np.ndarray,
     speeds: np.ndarray,
     accels: np.ndarray,
-    hearts: np.ndarray | None,
     params: AnalyzeParams,
     total_rows: int,
 ):
@@ -221,10 +206,6 @@ def build_as_profile(
     r2 = _r2(y, y_hat)
     s0 = float(-intercept / slope) if slope != 0 else float("inf")
 
-    heart_arr = None
-    if hearts is not None:
-        heart_arr = hearts[~np.isnan(hearts)]
-
     return {
         "all_points": [
             {"speed": float(xs), "accel": float(ys)}
@@ -254,7 +235,6 @@ def build_as_profile(
             "time": times.tolist(),
             "speed": speeds.tolist(),
             "acceleration": accels.tolist(),
-            "heartrate": hearts.tolist() if hearts is not None else None,
         },
         "stats": {
             "speed": {
@@ -265,9 +245,6 @@ def build_as_profile(
                 **_stats(accels),
                 "area": _curve_area(times, accels),
             },
-            "heartrate": _stats(heart_arr)
-            if heart_arr is not None and len(heart_arr)
-            else None,
         },
         "meta": {
             "n_all_points": int(len(all_s)),

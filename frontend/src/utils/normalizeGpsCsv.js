@@ -1,12 +1,9 @@
 const RAW_TIME_COL = "Time";
 const RAW_SPEED_COL = "Speed (m/s)";
 const RAW_ACCEL_COL = "Instantaneous Acceleration Impulse";
-const RAW_HEART_COL = "Heart Rate (bpm)";
-
 const NORMALIZED_TIME_COL = "time";
 const NORMALIZED_SPEED_COL = "speed";
 const NORMALIZED_ACCEL_COL = "acceleration";
-const NORMALIZED_HEART_COL = "heartrate";
 
 function parseCsvLine(line) {
   const cells = [];
@@ -92,8 +89,6 @@ export async function normalizeGpsCsvFile(file) {
   const timeIndex = getFieldIndex(headers, [RAW_TIME_COL, NORMALIZED_TIME_COL]);
   const speedIndex = getFieldIndex(headers, [RAW_SPEED_COL, NORMALIZED_SPEED_COL]);
   const accelIndex = getFieldIndex(headers, [RAW_ACCEL_COL, NORMALIZED_ACCEL_COL]);
-  const heartIndex = getFieldIndex(headers, [RAW_HEART_COL, NORMALIZED_HEART_COL]);
-
   if (timeIndex < 0 || speedIndex < 0 || accelIndex < 0) {
     throw new Error("CSV must contain time, speed and acceleration columns");
   }
@@ -104,12 +99,7 @@ export async function normalizeGpsCsvFile(file) {
   const treatAsRaw = rawTimeHeader && (rawSpeedHeader || rawAccelHeader);
 
   const outputLines = [
-    toCsvLine([
-      NORMALIZED_TIME_COL,
-      NORMALIZED_SPEED_COL,
-      NORMALIZED_ACCEL_COL,
-      NORMALIZED_HEART_COL,
-    ]),
+    toCsvLine([NORMALIZED_TIME_COL, NORMALIZED_SPEED_COL, NORMALIZED_ACCEL_COL]),
   ];
   const seenRows = new Set();
   let firstTimeSec = null;
@@ -120,8 +110,6 @@ export async function normalizeGpsCsvFile(file) {
       const tRaw = String(row[timeIndex] ?? "").trim();
       const s = Number(String(row[speedIndex] ?? "").trim());
       const a = Number(String(row[accelIndex] ?? "").trim());
-      const hRaw = String(row[heartIndex] ?? "").trim();
-
       if (!Number.isFinite(s) || !Number.isFinite(a)) {
         continue;
       }
@@ -137,19 +125,13 @@ export async function normalizeGpsCsvFile(file) {
       }
 
       const formattedTime = tSec.toFixed(3);
-      const key = `${formattedTime}|${s}|${a}|${hRaw}`;
+      const key = `${formattedTime}|${s}|${a}`;
       if (seenRows.has(key)) {
         continue;
       }
       seenRows.add(key);
 
-      let heart = "";
-      if (hRaw) {
-        const heartNumber = Number(hRaw);
-        heart = Number.isFinite(heartNumber) ? heartNumber.toFixed(2) : "";
-      }
-
-      outputLines.push(toCsvLine([formattedTime, s.toFixed(6), a.toFixed(6), heart]));
+      outputLines.push(toCsvLine([formattedTime, s.toFixed(6), a.toFixed(6)]));
       keptRows += 1;
     } catch {
       // skip invalid rows to match script behavior

@@ -3,6 +3,7 @@ import { memo } from "react";
 import AspChart from "../../components/AspChart/AspChart";
 import DistributionChart from "../../components/DistributionChart/DistributionChart";
 import TimeSeriesChart from "../../components/TimeSeriesChart/TimeSeriesChart";
+import { hexToRgba } from "../../utils/hexToRgba";
 import styles from "./Analysis.module.css";
 
 function AnalysisReport({
@@ -23,26 +24,45 @@ function AnalysisReport({
   speedReferenceLines,
   speedViolinChart,
   accelerationViolinChart,
-  heartrateViolinChart,
   fmt,
 }) {
   if (visibleResults.length === 0) {
     return <div className={styles.empty}>All series hidden. Use “Show”.</div>;
   }
 
+  const fmtDuration = (times) => {
+    if (!Array.isArray(times) || times.length < 2) return "—";
+    const start = Number(times[0]);
+    const end = Number(times[times.length - 1]);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return "—";
+    const totalSeconds = Math.round(end - start);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  };
+
   return (
     <>
       <div className={styles.reportTable}>
         <div className={`${styles.reportRow} ${styles.head}`}>
           <div className={styles.reportCellName}>Filename</div>
+          <div className={styles.reportCellMetric}>Duration (hh:mm:ss)</div>
           <div className={styles.reportCellModel}>Model</div>
           <div className={styles.reportCellFit}>ASP Equation</div>
           <div className={styles.reportCellMetric}>A0 (m/s²)</div>
           <div className={styles.reportCellMetric}>S0 (m/s)</div>
         </div>
         {results.map((item) => (
-          <div className={styles.reportRow} key={item.name}>
+          <div
+            className={styles.reportRow}
+            key={item.name}
+            style={{ background: hexToRgba(colorMap[item.name], 0.1) }}
+          >
             <div className={styles.reportCellName}>{item.name}</div>
+            <div className={styles.reportCellMetric}>
+              {fmtDuration(item.profile?.timeseries?.time)}
+            </div>
             <div className={styles.reportCellModel}>{item.profile?.fit?.label || "Linear regression"}</div>
             <div className={styles.reportCellFit}>
               {item.profile?.fit?.A0 != null && item.profile?.fit?.AS_slope != null
@@ -91,12 +111,25 @@ function AnalysisReport({
             <span>Mean</span>
             <span>Median</span>
             <span>Max</span>
-            <span>Area / Distance</span>
+            <span className={styles.statsHeadWithHelp}>
+              <span>Area</span>
+              <span className={styles.helpIcon} tabIndex={0}>
+                ?
+                <span className={styles.helpTooltip}>
+                  <span>Speed area = total distance.</span>
+                  <span>Acceleration area = player load (sum of acceleration changes).</span>
+                </span>
+              </span>
+            </span>
           </div>
           {combinedStatsRows.map((row) => {
             const units = metricUnits(row.metric);
             return (
-              <div className={styles.statsRow} key={`${row.fileName}-${row.metric}`}>
+              <div
+                className={styles.statsRow}
+                key={`${row.fileName}-${row.metric}`}
+                style={{ background: hexToRgba(colorMap[row.fileName], 0.1) }}
+              >
                 <span className={styles.statsLabel}>
                   <span className={styles.statsFileName}>{row.fileName} </span>
                   <span className={styles.statsMetricName}>{row.metricLabel}</span>
@@ -155,29 +188,6 @@ function AnalysisReport({
             />
           )}
         </div>
-
-        {combinedTimeseries.heartrateSeries.length > 0 && (
-          <div className={styles.timeseriesGrid}>
-            <TimeSeriesChart
-              title="Heartrate"
-              series={combinedTimeseries.heartrateSeries}
-              xTitle={xAxisTitle}
-              selectedPoints={visibleSelectedPoints}
-              pointWindow={pointWindow}
-              timeWindowSec={timeWindowSec}
-            />
-            {heartrateViolinChart && (
-              <DistributionChart
-                key={heartrateViolinChart.key}
-                title={heartrateViolinChart.title}
-                traces={heartrateViolinChart.traces}
-                violinMode={heartrateViolinChart.violinMode}
-                xAxis={heartrateViolinChart.xAxis}
-                yAxis={heartrateViolinChart.yAxis}
-              />
-            )}
-          </div>
-        )}
       </section>
     </>
   );
