@@ -162,6 +162,7 @@ export default function Analysis() {
             box: { visible: true },
             meanline: { visible: true },
             points: false,
+            hoveron: "kde",
             spanmode: "soft",
             scalemode: "width",
             line: { color },
