@@ -40,6 +40,10 @@ export default function Analysis() {
   const [pointWindow, setPointWindow] = useState(10);
   const [timeWindowSec, setTimeWindowSec] = useState(10);
   const [pointsSortRules, setPointsSortRules] = useState([]);
+  const [speedSeriesUnit, setSpeedSeriesUnit] = useState(
+    () => localStorage.getItem("analysis_speed_series_unit") || "m/s",
+  );
+  const [timeMode, setTimeMode] = useState(() => localStorage.getItem("analysis_time_mode") || "relative");
   const visibleResults = results.filter((r) => !hiddenMap[r.name]);
   const pointKey = (p) => `${p.name}::${p.index}`;
   const visibleFileNames = new Set(visibleResults.map((r) => r.name));
@@ -86,6 +90,95 @@ export default function Analysis() {
     return ` ${dir}(${idx + 1})`;
   };
 
+  useEffect(() => {
+    localStorage.setItem("analysis_time_mode", timeMode);
+  }, [timeMode]);
+
+  useEffect(() => {
+    localStorage.setItem("analysis_speed_series_unit", speedSeriesUnit);
+  }, [speedSeriesUnit]);
+
+  const toKmh = (value) => Number(value) * 3.6;
+  const speedSeriesFactor = speedSeriesUnit === "km/h" ? 3.6 : 1;
+  const speedSeriesUnitLabel = speedSeriesUnit;
+  const formatSecondsDynamic = (value) => {
+    if (value === undefined || value === null || Number.isNaN(value)) return "—";
+    const totalSeconds = Number(value);
+    if (Math.abs(totalSeconds) < 60) return `${totalSeconds.toFixed(3).replace(/\.?0+$/, "")} s`;
+    const sign = totalSeconds < 0 ? "-" : "";
+    const safeSeconds = Math.abs(totalSeconds);
+    const hours = Math.floor(safeSeconds / 3600);
+    const minutes = Math.floor((safeSeconds % 3600) / 60);
+    const seconds = Math.floor(safeSeconds % 60);
+    if (hours > 0) {
+      return `${sign}${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    }
+    return `${sign}${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  };
+  const formatAbsoluteClock = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return "—";
+    const parts = raw.split(":");
+    if (parts.length !== 3) return raw;
+    const hours = Number(parts[0]);
+    const minutes = Number(parts[1]);
+    const seconds = Number(parts[2]);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes) || !Number.isFinite(seconds)) {
+      return raw;
+    }
+    const wholeSeconds = Number.isInteger(seconds)
+      ? String(seconds).padStart(2, "0")
+      : seconds.toFixed(3).padStart(6, "0").replace(/\.?0+$/, "");
+    if (hours > 0) return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${wholeSeconds}`;
+    if (minutes > 0) return `${String(minutes).padStart(2, "0")}:${wholeSeconds}`;
+    return `${wholeSeconds} s`;
+  };
+  const formatSpeedPair = (value) => {
+    if (value === undefined || value === null || Number.isNaN(value)) return "—";
+    return `${Number(value).toFixed(3)} m/s (${toKmh(value).toFixed(3)} km/h)`;
+  };
+  const formatSpeedMs = (value) => {
+    if (value === undefined || value === null || Number.isNaN(value)) return "—";
+    return `${Number(value).toFixed(3)} m/s`;
+  };
+  const formatDistanceKm = (value) => {
+    if (value === undefined || value === null || Number.isNaN(value)) return "—";
+    return `${(Number(value) / 1000).toFixed(3)} km`;
+  };
+  const fitSlopeLabel = (value) => {
+    if (value === undefined || value === null || Number.isNaN(value)) return "—";
+    return `${Number(value).toFixed(3)}`;
+  };
+  const formatTimeSummary = (timeseries) => {
+    const times = timeseries?.time;
+    if (!Array.isArray(times) || times.length < 2) return "—";
+    const start = Number(times[0]);
+    const end = Number(times[times.length - 1]);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return "—";
+    if (
+      timeMode === "absolute" &&
+      Array.isArray(timeseries?.absolute_time) &&
+      timeseries.absolute_time[0] &&
+      timeseries.absolute_time[timeseries.absolute_time.length - 1]
+    ) {
+      return `${formatAbsoluteClock(timeseries.absolute_time[0])} -> ${formatAbsoluteClock(timeseries.absolute_time[timeseries.absolute_time.length - 1])}`;
+    }
+    return formatSecondsDynamic(end - start);
+  };
+  const formatPointTime = (point) => {
+    if (timeMode === "absolute" && point?.absoluteTime) return formatAbsoluteClock(point.absoluteTime);
+    return formatSecondsDynamic(point?.time);
+  };
+  const canUseAbsoluteTimeAxis =
+    timeMode === "absolute" &&
+    visibleResults.some(
+      (item) =>
+        Array.isArray(item?.profile?.timeseries?.absolute_time) &&
+        item.profile.timeseries.absolute_time.length > 0,
+    );
+  const formatTimeAxisTick = (value, label) =>
+    canUseAbsoluteTimeAxis && label ? formatAbsoluteClock(label) : formatSecondsDynamic(value);
+
   const combinedTimeseries = useMemo(() => {
     const speedSeries = [];
     const accelerationSeries = [];
@@ -96,7 +189,13 @@ export default function Analysis() {
       const seriesName = item.name;
 
       if (ts?.time?.length && ts.speed?.length) {
-        speedSeries.push({ name: seriesName, values: ts.speed, color, x: ts.time });
+        speedSeries.push({
+          name: seriesName,
+          values: ts.speed.map((value) => Number(value) * speedSeriesFactor),
+          color,
+          x: ts.time,
+          labels: ts.absolute_time,
+        });
       }
       if (ts?.time?.length && ts.acceleration?.length) {
         accelerationSeries.push({
@@ -104,23 +203,24 @@ export default function Analysis() {
           values: ts.acceleration,
           color,
           x: ts.time,
+          labels: ts.absolute_time,
         });
       }
     });
 
     return { speedSeries, accelerationSeries };
-  }, [visibleResults, colorMap]);
+  }, [visibleResults, colorMap, speedSeriesFactor]);
   const speedReferenceLines = useMemo(
     () =>
       visibleResults
         .map((item) => ({
-          y: Number(item?.profile?.meta?.min_speed),
+          y: Number(item?.profile?.meta?.min_speed) * speedSeriesFactor,
           color: colorMap[item.name],
           width: 1.5,
           dash: "dash",
         }))
         .filter((line) => Number.isFinite(line.y)),
-    [visibleResults, colorMap],
+    [visibleResults, colorMap, speedSeriesFactor],
   );
 
   const combinedStatsRows = useMemo(() => {
@@ -298,11 +398,11 @@ export default function Analysis() {
     return `${Number(v).toFixed(3)} ${unit}`;
   };
   const metricUnits = (metric) => {
-    if (metric === "speed") return { value: "m/s", area: "m" };
+    if (metric === "speed") return { value: "m/s", area: "km" };
     if (metric === "acceleration") return { value: "m/s²", area: "m/s" };
     return { value: "", area: null };
   };
-  const xAxisTitle = "Time from start (s)";
+  const xAxisTitle = canUseAbsoluteTimeAxis ? "Absolute time" : "Time from start";
   const allShown = results.length > 0 && results.every((r) => !hiddenMap[r.name]);
   const shownCount = results.filter((r) => !hiddenMap[r.name]).length;
   const speedViolinChart = violinCharts.find((chart) => chart.key === "speed");
@@ -390,6 +490,13 @@ export default function Analysis() {
               filteredSelectedPoints={filteredSelectedPoints}
               toggleSortRule={toggleSortRule}
               sortBadge={sortBadge}
+              speedSeriesUnit={speedSeriesUnit}
+              setSpeedSeriesUnit={setSpeedSeriesUnit}
+              timeMode={timeMode}
+              setTimeMode={setTimeMode}
+              formatSpeedPair={formatSpeedPair}
+              formatPointTime={formatPointTime}
+              fmt={fmt}
             />
           </aside>
         </>
@@ -413,6 +520,13 @@ export default function Analysis() {
         speedViolinChart={speedViolinChart}
         accelerationViolinChart={accelerationViolinChart}
         fmt={fmt}
+        formatSpeedPair={formatSpeedPair}
+        formatSpeedMs={formatSpeedMs}
+        formatDistanceKm={formatDistanceKm}
+        formatTimeSummary={formatTimeSummary}
+        fitSlopeLabel={fitSlopeLabel}
+        xTickFormatter={formatTimeAxisTick}
+        speedSeriesUnitLabel={speedSeriesUnitLabel}
       />
     </section>
   );

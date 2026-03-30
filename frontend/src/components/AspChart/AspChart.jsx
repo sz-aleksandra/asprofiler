@@ -10,6 +10,8 @@ export default function AspChart({
   title = "Acceleration Speed Profile",
   colorMap,
   hiddenMap,
+  formatSpeed = (value) => value,
+  speedUnitLabel = "m/s",
   onPointSelect,
   onPointsSelect,
   selectedPoints,
@@ -47,6 +49,7 @@ export default function AspChart({
       const cutoff = Number(profile?.meta?.min_speed ?? 0);
       const {
         time: tsTime = [],
+        absolute_time: tsAbsoluteTime = [],
         speed: tsSpeed = [],
         acceleration: tsAccel = [],
       } = profile?.timeseries || {};
@@ -55,6 +58,7 @@ export default function AspChart({
       const all = (tsTime || []).map((t, i) => ({
         index: i,
         time: Number(t),
+        absoluteTime: tsAbsoluteTime[i] || "",
         speed: Number(tsSpeed[i]),
         accel: Number(tsAccel[i]),
       }));
@@ -96,6 +100,7 @@ export default function AspChart({
         item.name,
         Number.isInteger(point.index) ? point.index : -1,
         Number.isFinite(Number(point.time)) ? Number(point.time) : null,
+        point.absoluteTime || "",
         Number(point.speed),
         Number(point.accel),
         kind,
@@ -106,7 +111,7 @@ export default function AspChart({
           name: `${item.name} rejected`,
           type: "scattergl",
           mode: "markers",
-          x: rejected.map((p) => p.speed),
+          x: rejected.map((p) => formatSpeed(p.speed)),
           y: rejected.map((p) => p.accel),
           customdata: rejected.map((p) => asCustomData(p, "rejected")),
           marker: { size: 4, color: base ? hexToRgba(base, 0.2) : undefined },
@@ -116,7 +121,7 @@ export default function AspChart({
           name: `${item.name} included`,
           type: "scattergl",
           mode: "markers",
-          x: included.map((p) => p.speed),
+          x: included.map((p) => formatSpeed(p.speed)),
           y: included.map((p) => p.accel),
           customdata: included.map((p) => asCustomData(p, "included")),
           marker: { size: 4, color: base ? hexToRgba(base, 0.4) : undefined },
@@ -126,7 +131,7 @@ export default function AspChart({
           name: `${item.name} points`,
           type: "scattergl",
           mode: "markers",
-          x: selected.map((p) => p.speed),
+          x: selected.map((p) => formatSpeed(p.speed)),
           y: selected.map((p) => p.accel),
           customdata: selected.map((p) => asCustomData(p, "points")),
           marker: { size: 7, color: base ? hexToRgba(base, 0.9) : undefined },
@@ -136,8 +141,8 @@ export default function AspChart({
 
       shapes.push({
         type: "line",
-        x0: cutoff,
-        x1: cutoff,
+        x0: formatSpeed(cutoff),
+        x1: formatSpeed(cutoff),
         y0: 0,
         y1: 1,
         xref: "x",
@@ -155,7 +160,7 @@ export default function AspChart({
           name: `${item.name} fit`,
           type: "scatter",
           mode: "lines",
-          x: fitCurve.map((point) => Number(point.speed)),
+          x: fitCurve.map((point) => formatSpeed(Number(point.speed))),
           y: fitCurve.map((point) => Number(point.accel)),
           line: { color: base, width: 2 },
           showlegend: true,
@@ -180,7 +185,7 @@ export default function AspChart({
               name: `${item.name} context`,
               type: "scatter",
               mode: "lines+markers",
-              x: windowPoints.map((p) => p.speed),
+              x: windowPoints.map((p) => formatSpeed(p.speed)),
               y: windowPoints.map((p) => p.accel),
               customdata: windowPoints.map((p) => asCustomData(p, "context")),
               line: {
@@ -203,7 +208,7 @@ export default function AspChart({
             name: `${item.name} selected`,
             type: "scatter",
             mode: "markers",
-            x: ordered.map((p) => p.speed),
+            x: ordered.map((p) => formatSpeed(p.speed)),
             y: ordered.map((p) => p.accel),
             customdata: ordered.map((p) => asCustomData(p, "selected")),
             marker: {
@@ -220,11 +225,11 @@ export default function AspChart({
     return {
       traces: allTraces,
       shapes,
-      minSpeed: Number.isFinite(globalMinSpeed) ? globalMinSpeed : 0,
-      maxSpeed: Number.isFinite(globalMaxSpeed) ? globalMaxSpeed : 0,
+      minSpeed: Number.isFinite(globalMinSpeed) ? formatSpeed(globalMinSpeed) : 0,
+      maxSpeed: Number.isFinite(globalMaxSpeed) ? formatSpeed(globalMaxSpeed) : 0,
       maxAccel: Number.isFinite(globalMaxAccel) ? globalMaxAccel : 0,
     };
-  }, [profiles, colorMap, hiddenMap, selectedPoints, pointWindow]);
+  }, [profiles, colorMap, hiddenMap, selectedPoints, pointWindow, formatSpeed]);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;
@@ -236,7 +241,7 @@ export default function AspChart({
       uirevision: title,
       margin: { l: 50, r: 20, t: 40, b: 110 },
       xaxis: {
-        title: { text: "Speed (m/s)", font: { color: cssBlack } },
+        title: { text: `Speed (${speedUnitLabel})`, font: { color: cssBlack } },
         tickfont: { color: cssBlack },
         range: [data.minSpeed, data.maxSpeed],
       },
@@ -282,14 +287,15 @@ export default function AspChart({
       if (!onPointSelect) return;
       const hit = event?.points?.[0];
       const custom = hit?.customdata;
-      if (!Array.isArray(custom) || custom.length < 5) return;
+      if (!Array.isArray(custom) || custom.length < 7) return;
       onPointSelect({
         name: custom[0],
         index: Number(custom[1]),
         time: custom[2] === null ? null : Number(custom[2]),
-        speed: Number(custom[3]),
-        accel: Number(custom[4]),
-        kind: custom[5] || "point",
+        absoluteTime: custom[3] || "",
+        speed: Number(custom[4]),
+        accel: Number(custom[5]),
+        kind: custom[6] || "point",
       });
     };
     const onSelected = (event) => {
@@ -298,14 +304,15 @@ export default function AspChart({
       if (!hits.length) return;
       const points = hits
         .map((h) => h?.customdata)
-        .filter((c) => Array.isArray(c) && c.length >= 5)
+        .filter((c) => Array.isArray(c) && c.length >= 7)
         .map((c) => ({
           name: c[0],
           index: Number(c[1]),
           time: c[2] === null ? null : Number(c[2]),
-          speed: Number(c[3]),
-          accel: Number(c[4]),
-          kind: c[5] || "point",
+          absoluteTime: c[3] || "",
+          speed: Number(c[4]),
+          accel: Number(c[5]),
+          kind: c[6] || "point",
         }));
       if (points.length) onPointsSelect(points);
     };
@@ -321,7 +328,7 @@ export default function AspChart({
       }
       ro.disconnect();
     };
-  }, [data, title, onPointSelect, onPointsSelect]);
+  }, [data, title, onPointSelect, onPointsSelect, speedUnitLabel]);
 
   return <div className={styles.chart} ref={containerRef} />;
 }

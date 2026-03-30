@@ -7,9 +7,11 @@ import { hexToRgba } from "../../utils/hexToRgba";
 
 export default function TimeSeriesChart({
   title,
+  yTitle,
   time,
   series,
   xTitle = "Time series",
+  xTickFormatter,
   selectedPoints,
   pointWindow,
   timeWindowSec,
@@ -27,12 +29,17 @@ export default function TimeSeriesChart({
       })
       .map((s) => {
         const baseColor = s.color;
+        const labels = Array.isArray(s.labels) ? s.labels : [];
         return {
           name: s.name,
           type: "scattergl",
           mode: "lines",
           x: s.x || time,
           y: s.values,
+          customdata: labels.map((label) => [label || ""]),
+          hovertemplate: labels.length
+            ? "Time: %{customdata[0]}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>"
+            : "Time: %{x:.3f}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>",
           line: { color: hexToRgba(baseColor, 0.4), width: 1.5 },
         };
       });
@@ -93,12 +100,17 @@ export default function TimeSeriesChart({
         if (xWindow.length > 1) {
           const selectedSet = selectedIndexBySeries.get(selectedName) || new Set();
           const markerSizes = xWindow.map((_, i) => (selectedSet.has(pFrom + i) ? 0 : 7));
+          const labelWindow = target?.labels?.slice(pFrom, pTo + 1) || [];
           next.push({
             name: `${selectedName} context`,
             type: "scatter",
             mode: "lines+markers",
             x: xWindow,
             y: yWindow,
+            customdata: labelWindow.map((label) => [label || ""]),
+            hovertemplate: labelWindow.length
+              ? "Time: %{customdata[0]}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>"
+              : "Time: %{x:.3f}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>",
             line: { color: target?.color, width: 2 },
             marker: {
               size: markerSizes,
@@ -114,6 +126,11 @@ export default function TimeSeriesChart({
           mode: "markers",
           x: [xData[selectedIndex]],
           y: [yData[selectedIndex]],
+          customdata: [[target?.labels?.[selectedIndex] || ""]],
+          hovertemplate:
+            target?.labels?.[selectedIndex]
+              ? "Time: %{customdata[0]}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>"
+              : "Time: %{x:.3f}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>",
           marker: {
             size: 7,
             color: target?.color,
@@ -142,7 +159,16 @@ export default function TimeSeriesChart({
         },
       }));
 
-    return { traces: next, shapes: [...shapes, ...refShapes] };
+    const referenceSeries = [...series]
+      .filter((s) => (s.x || time)?.length)
+      .sort((a, b) => ((b.x || time)?.length || 0) - ((a.x || time)?.length || 0))[0];
+
+    return {
+      traces: next,
+      shapes: [...shapes, ...refShapes],
+      referenceX: referenceSeries?.x || time || [],
+      referenceLabels: referenceSeries?.labels || [],
+    };
   }, [time, series, selectedPoints, pointWindow, timeWindowSec, cssBlack, yReferenceLines]);
 
   useEffect(() => {
@@ -160,7 +186,7 @@ export default function TimeSeriesChart({
         type: "linear",
       },
       yaxis: {
-        title: { text: title, font: { color: cssBlack } },
+        title: { text: yTitle || title, font: { color: cssBlack } },
         tickfont: { color: cssBlack },
       },
       shapes: plotData.shapes,
@@ -175,6 +201,20 @@ export default function TimeSeriesChart({
       },
     };
 
+    if (typeof xTickFormatter === "function" && Array.isArray(plotData.referenceX) && plotData.referenceX.length) {
+      const maxTicks = Math.min(8, plotData.referenceX.length);
+      const tickIndexes = Array.from(
+        { length: maxTicks },
+        (_, idx) => Math.round((idx * (plotData.referenceX.length - 1)) / Math.max(maxTicks - 1, 1)),
+      );
+      const uniqueIndexes = [...new Set(tickIndexes)];
+      layout.xaxis.tickmode = "array";
+      layout.xaxis.tickvals = uniqueIndexes.map((idx) => Number(plotData.referenceX[idx]));
+      layout.xaxis.ticktext = uniqueIndexes.map((idx) =>
+        xTickFormatter(Number(plotData.referenceX[idx]), plotData.referenceLabels?.[idx], idx),
+      );
+    }
+
     const config = {
       responsive: true,
       displayModeBar: true,
@@ -184,7 +224,7 @@ export default function TimeSeriesChart({
     const ro = new ResizeObserver(() => Plotly.Plots.resize(node));
     ro.observe(node);
     return () => ro.disconnect();
-  }, [plotData, title, xTitle]);
+  }, [plotData, title, xTitle, yTitle, xTickFormatter]);
 
   if (!plotData) return null;
 

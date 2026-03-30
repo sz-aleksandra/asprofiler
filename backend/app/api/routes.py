@@ -39,9 +39,9 @@ async def analyze_files(
         try:
             content = await uploaded.read()
             text = content.decode("utf-8-sig")
-            times, speeds, accels, total_rows = load_series_stream(StringIO(text))
+            times, speeds, accels, absolute_times, total_rows = load_series_stream(StringIO(text))
             logger.info("analyze transient %s rows=%d", name, total_rows)
-            profile = build_as_profile(times, speeds, accels, params, total_rows)
+            profile = build_as_profile(times, speeds, accels, absolute_times, params, total_rows)
             results.append({"name": name, "profile": profile})
         except HTTPException as exc:
             results.append({"name": name, "error": str(exc.detail)})

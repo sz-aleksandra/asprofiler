@@ -23,6 +23,13 @@ export default function AnalysisToolbar({
   filteredSelectedPoints,
   toggleSortRule,
   sortBadge,
+  speedSeriesUnit,
+  setSpeedSeriesUnit,
+  timeMode,
+  setTimeMode,
+  formatSpeedPair,
+  formatPointTime,
+  fmt,
 }) {
   return (
     <div className={styles.controls}>
@@ -86,6 +93,36 @@ export default function AnalysisToolbar({
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className={styles.drawerSection}>
+        <div className={styles.drawerSectionTitle}>Display</div>
+        <div className={styles.toolbar}>
+          <div className={styles.selectionControls}>
+            <label className={styles.selectionLabel}>
+              Speed chart
+              <select
+                className={styles.selectionSelect}
+                value={speedSeriesUnit}
+                onChange={(e) => setSpeedSeriesUnit(e.target.value)}
+              >
+                <option value="m/s">m/s</option>
+                <option value="km/h">km/h</option>
+              </select>
+            </label>
+            <label className={styles.selectionLabel}>
+              Time display
+              <select
+                className={styles.selectionSelect}
+                value={timeMode}
+                onChange={(e) => setTimeMode(e.target.value)}
+              >
+                <option value="relative">Relative</option>
+                <option value="absolute">Absolute</option>
+              </select>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -184,7 +221,7 @@ export default function AnalysisToolbar({
                 Filename{sortBadge("name") || " ↕"}
               </button>
               <button className={styles.selectionSortBtn} type="button" onClick={() => toggleSortRule("time")}>
-                Time{sortBadge("time") || " ↕"}
+                Time{timeMode === "absolute" ? " abs." : ""}{sortBadge("time") || " ↕"}
               </button>
               <button className={styles.selectionSortBtn} type="button" onClick={() => toggleSortRule("speed")}>
                 Speed{sortBadge("speed") || " ↕"}
@@ -215,8 +252,8 @@ export default function AnalysisToolbar({
                   />
                 </div>
                 <div className={styles.selectionFile}>{p.name}</div>
-                <div className={styles.selectionCol}>{fmt(p.time)}s</div>
-                <div className={styles.selectionCol}>{fmt(p.speed)}</div>
+                <div className={styles.selectionCol}>{formatPointTime(p)}</div>
+                <div className={styles.selectionCol}>{formatSpeedPair(p.speed)}</div>
                 <div className={styles.selectionCol}>{fmt(p.accel)}</div>
                 <div className={styles.selectionActions}>
                   <button

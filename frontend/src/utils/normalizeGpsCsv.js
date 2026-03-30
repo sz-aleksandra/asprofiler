@@ -2,6 +2,7 @@ const RAW_TIME_COL = "Time";
 const RAW_SPEED_COL = "Speed (m/s)";
 const RAW_ACCEL_COL = "Instantaneous Acceleration Impulse";
 const NORMALIZED_TIME_COL = "time";
+const NORMALIZED_ABSOLUTE_TIME_COL = "absolute_time";
 const NORMALIZED_SPEED_COL = "speed";
 const NORMALIZED_ACCEL_COL = "acceleration";
 
@@ -87,6 +88,7 @@ export async function normalizeGpsCsvFile(file) {
 
   const headers = rows[0];
   const timeIndex = getFieldIndex(headers, [RAW_TIME_COL, NORMALIZED_TIME_COL]);
+  const absoluteTimeIndex = getFieldIndex(headers, [NORMALIZED_ABSOLUTE_TIME_COL]);
   const speedIndex = getFieldIndex(headers, [RAW_SPEED_COL, NORMALIZED_SPEED_COL]);
   const accelIndex = getFieldIndex(headers, [RAW_ACCEL_COL, NORMALIZED_ACCEL_COL]);
   if (timeIndex < 0 || speedIndex < 0 || accelIndex < 0) {
@@ -99,7 +101,12 @@ export async function normalizeGpsCsvFile(file) {
   const treatAsRaw = rawTimeHeader && (rawSpeedHeader || rawAccelHeader);
 
   const outputLines = [
-    toCsvLine([NORMALIZED_TIME_COL, NORMALIZED_SPEED_COL, NORMALIZED_ACCEL_COL]),
+    toCsvLine([
+      NORMALIZED_TIME_COL,
+      NORMALIZED_ABSOLUTE_TIME_COL,
+      NORMALIZED_SPEED_COL,
+      NORMALIZED_ACCEL_COL,
+    ]),
   ];
   const seenRows = new Set();
   let firstTimeSec = null;
@@ -108,6 +115,7 @@ export async function normalizeGpsCsvFile(file) {
   for (const row of rows.slice(1)) {
     try {
       const tRaw = String(row[timeIndex] ?? "").trim();
+      const absoluteTimeRaw = String(row[absoluteTimeIndex] ?? "").trim();
       const s = Number(String(row[speedIndex] ?? "").trim());
       const a = Number(String(row[accelIndex] ?? "").trim());
       if (!Number.isFinite(s) || !Number.isFinite(a)) {
@@ -131,7 +139,10 @@ export async function normalizeGpsCsvFile(file) {
       }
       seenRows.add(key);
 
-      outputLines.push(toCsvLine([formattedTime, s.toFixed(6), a.toFixed(6)]));
+      const absoluteTime = treatAsRaw ? tRaw : absoluteTimeRaw;
+      outputLines.push(
+        toCsvLine([formattedTime, absoluteTime, s.toFixed(6), a.toFixed(6)]),
+      );
       keptRows += 1;
     } catch {
       // skip invalid rows to match script behavior

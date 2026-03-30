@@ -10,17 +10,18 @@ from app.models import AnalyzeParams
 
 def load_series(
     path: Path,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str] | None, int]:
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         return load_series_stream(f)
 
 
 def load_series_stream(
     stream,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str] | None, int]:
     speeds = []
     accels = []
     times = []
+    absolute_times = []
     total_rows = 0
     reader = csv.DictReader(stream)
     if reader.fieldnames is None:
@@ -36,6 +37,7 @@ def load_series_stream(
             detail="CSV must contain time, speed, acceleration columns",
         )
     time_col = field_map["time"]
+    absolute_time_col = field_map.get("absolute_time")
     speed_col = field_map["speed"]
     accel_col = field_map["acceleration"]
     for row in reader:
@@ -56,6 +58,8 @@ def load_series_stream(
         speeds.append(s)
         accels.append(a)
         times.append(t)
+        if absolute_time_col:
+            absolute_times.append(str(row.get(absolute_time_col, "") or "").strip())
 
     if not speeds:
         raise HTTPException(status_code=400, detail="No valid speed/accel rows found")
@@ -64,6 +68,7 @@ def load_series_stream(
         np.array(times, dtype=float),
         np.array(speeds, dtype=float),
         np.array(accels, dtype=float),
+        absolute_times if absolute_time_col else None,
         total_rows,
     )
 
@@ -168,6 +173,7 @@ def build_as_profile(
     times: np.ndarray,
     speeds: np.ndarray,
     accels: np.ndarray,
+    absolute_times: list[str] | None,
     params: AnalyzeParams,
     total_rows: int,
 ):
@@ -235,6 +241,11 @@ def build_as_profile(
             "time": times.tolist(),
             "speed": speeds.tolist(),
             "acceleration": accels.tolist(),
+            **(
+                {"absolute_time": absolute_times}
+                if absolute_times and len(absolute_times) == len(times)
+                else {}
+            ),
         },
         "stats": {
             "speed": {

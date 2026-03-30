@@ -33,7 +33,7 @@ def downsample_csv(input_path: Path, output_path: Path) -> dict:
     ):
         reader = csv.DictReader(src)
         writer = csv.writer(dst)
-        writer.writerow(["time", "speed", "acceleration"])
+        writer.writerow(["time", "absolute_time", "speed", "acceleration"])
 
         for row in reader:
             total_rows += 1
@@ -60,7 +60,7 @@ def downsample_csv(input_path: Path, output_path: Path) -> dict:
                 continue
             seen_rows.add(key)
 
-            writer.writerow([f"{t_rel_sec:.3f}", f"{s:.6f}", f"{a:.6f}"])
+            writer.writerow([f"{t_rel_sec:.3f}", t, f"{s:.6f}", f"{a:.6f}"])
             kept_rows += 1
 
     return {

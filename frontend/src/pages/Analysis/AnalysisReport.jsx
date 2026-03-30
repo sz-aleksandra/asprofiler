@@ -25,33 +25,28 @@ function AnalysisReport({
   speedViolinChart,
   accelerationViolinChart,
   fmt,
+  formatSpeedPair,
+  formatSpeedMs,
+  formatDistanceKm,
+  formatTimeSummary,
+  fitSlopeLabel,
+  xTickFormatter,
+  speedSeriesUnitLabel,
 }) {
   if (visibleResults.length === 0) {
     return <div className={styles.empty}>All series hidden. Use “Show”.</div>;
   }
-
-  const fmtDuration = (times) => {
-    if (!Array.isArray(times) || times.length < 2) return "—";
-    const start = Number(times[0]);
-    const end = Number(times[times.length - 1]);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return "—";
-    const totalSeconds = Math.round(end - start);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  };
 
   return (
     <>
       <div className={styles.reportTable}>
         <div className={`${styles.reportRow} ${styles.head}`}>
           <div className={styles.reportCellName}>Filename</div>
-          <div className={styles.reportCellMetric}>Duration (hh:mm:ss)</div>
+          <div className={styles.reportCellMetric}>Time</div>
           <div className={styles.reportCellModel}>Model</div>
           <div className={styles.reportCellFit}>ASP Equation</div>
           <div className={styles.reportCellMetric}>A0 (m/s²)</div>
-          <div className={styles.reportCellMetric}>S0 (m/s)</div>
+          <div className={styles.reportCellMetric}>S0</div>
         </div>
         {results.map((item) => (
           <div
@@ -61,19 +56,19 @@ function AnalysisReport({
           >
             <div className={styles.reportCellName}>{item.name}</div>
             <div className={styles.reportCellMetric}>
-              {fmtDuration(item.profile?.timeseries?.time)}
+              {formatTimeSummary(item.profile?.timeseries)}
             </div>
             <div className={styles.reportCellModel}>{item.profile?.fit?.label || "Linear regression"}</div>
             <div className={styles.reportCellFit}>
               {item.profile?.fit?.A0 != null && item.profile?.fit?.AS_slope != null
-                ? `a = ${fmt(item.profile.fit.A0)} + (${fmt(item.profile.fit.AS_slope)}) · v`
+                ? `a = ${fmt(item.profile.fit.A0)} + (${fitSlopeLabel(item.profile.fit.AS_slope)}) · v`
                 : "—"}
             </div>
             <div className={styles.reportCellMetric}>
               {item.profile?.fit?.A0 != null ? fmt(item.profile.fit.A0) : "—"}
             </div>
             <div className={styles.reportCellMetric}>
-              {item.profile?.fit?.S0 != null ? fmt(item.profile.fit.S0) : "—"}
+              {item.profile?.fit?.S0 != null ? formatSpeedMs(item.profile.fit.S0) : "—"}
             </div>
           </div>
         ))}
@@ -134,12 +129,20 @@ function AnalysisReport({
                   <span className={styles.statsFileName}>{row.fileName} </span>
                   <span className={styles.statsMetricName}>{row.metricLabel}</span>
                 </span>
-                <span className={styles.statsValue}>{fmtWithUnit(row.values?.min, units.value)}</span>
-                <span className={styles.statsValue}>{fmtWithUnit(row.values?.mean, units.value)}</span>
-                <span className={styles.statsValue}>{fmtWithUnit(row.values?.median, units.value)}</span>
-                <span className={styles.statsValue}>{fmtWithUnit(row.values?.max, units.value)}</span>
                 <span className={styles.statsValue}>
-                  {units.area ? fmtWithUnit(row.values?.area, units.area) : "-"}
+                  {row.metric === "speed" ? formatSpeedPair(row.values?.min) : fmtWithUnit(row.values?.min, units.value)}
+                </span>
+                <span className={styles.statsValue}>
+                  {row.metric === "speed" ? formatSpeedPair(row.values?.mean) : fmtWithUnit(row.values?.mean, units.value)}
+                </span>
+                <span className={styles.statsValue}>
+                  {row.metric === "speed" ? formatSpeedPair(row.values?.median) : fmtWithUnit(row.values?.median, units.value)}
+                </span>
+                <span className={styles.statsValue}>
+                  {row.metric === "speed" ? formatSpeedPair(row.values?.max) : fmtWithUnit(row.values?.max, units.value)}
+                </span>
+                <span className={styles.statsValue}>
+                  {row.metric === "speed" ? formatDistanceKm(row.values?.area) : units.area ? fmtWithUnit(row.values?.area, units.area) : "-"}
                 </span>
               </div>
             );
@@ -149,8 +152,10 @@ function AnalysisReport({
         <div className={styles.timeseriesGrid}>
           <TimeSeriesChart
             title="Speed"
+            yTitle={`Speed (${speedSeriesUnitLabel})`}
             series={combinedTimeseries.speedSeries}
             xTitle={xAxisTitle}
+            xTickFormatter={xTickFormatter}
             selectedPoints={visibleSelectedPoints}
             pointWindow={pointWindow}
             timeWindowSec={timeWindowSec}
@@ -173,6 +178,7 @@ function AnalysisReport({
             title="Acceleration"
             series={combinedTimeseries.accelerationSeries}
             xTitle={xAxisTitle}
+            xTickFormatter={xTickFormatter}
             selectedPoints={visibleSelectedPoints}
             pointWindow={pointWindow}
             timeWindowSec={timeWindowSec}
