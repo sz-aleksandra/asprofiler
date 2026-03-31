@@ -22,6 +22,14 @@ export default function TimeSeriesChart({
 
   const plotData = useMemo(() => {
     if (!series?.length) return null;
+    const getHoverTimeLabel = (xValue, label, index) => {
+      if (typeof xTickFormatter === "function") {
+        return xTickFormatter(Number(xValue), label, index);
+      }
+      if (label) return label;
+      if (xValue === undefined || xValue === null || Number.isNaN(Number(xValue))) return "—";
+      return String(xValue);
+    };
     const next = series
       .filter((s) => {
         const x = s.x || time;
@@ -30,16 +38,17 @@ export default function TimeSeriesChart({
       .map((s) => {
         const baseColor = s.color;
         const labels = Array.isArray(s.labels) ? s.labels : [];
+        const xValues = s.x || time;
         return {
           name: s.name,
           type: "scattergl",
           mode: "lines",
-          x: s.x || time,
+          x: xValues,
           y: s.values,
-          customdata: labels.map((label) => [label || ""]),
-          hovertemplate: labels.length
-            ? "Time: %{customdata[0]}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>"
-            : "Time: %{x:.3f}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>",
+          customdata: xValues.map((xValue, index) => [
+            getHoverTimeLabel(xValue, labels[index] || "", index),
+          ]),
+          hovertemplate: "Time: %{customdata[0]}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>",
           line: { color: hexToRgba(baseColor, 0.4), width: 1.5 },
         };
       });
@@ -107,10 +116,10 @@ export default function TimeSeriesChart({
             mode: "lines+markers",
             x: xWindow,
             y: yWindow,
-            customdata: labelWindow.map((label) => [label || ""]),
-            hovertemplate: labelWindow.length
-              ? "Time: %{customdata[0]}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>"
-              : "Time: %{x:.3f}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>",
+            customdata: xWindow.map((xValue, index) => [
+              getHoverTimeLabel(xValue, labelWindow[index] || "", pFrom + index),
+            ]),
+            hovertemplate: "Time: %{customdata[0]}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>",
             line: { color: target?.color, width: 2 },
             marker: {
               size: markerSizes,
@@ -126,11 +135,14 @@ export default function TimeSeriesChart({
           mode: "markers",
           x: [xData[selectedIndex]],
           y: [yData[selectedIndex]],
-          customdata: [[target?.labels?.[selectedIndex] || ""]],
-          hovertemplate:
-            target?.labels?.[selectedIndex]
-              ? "Time: %{customdata[0]}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>"
-              : "Time: %{x:.3f}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>",
+          customdata: [[
+            getHoverTimeLabel(
+              xData[selectedIndex],
+              target?.labels?.[selectedIndex] || "",
+              selectedIndex,
+            ),
+          ]],
+          hovertemplate: "Time: %{customdata[0]}<br>Value: %{y:.3f}<extra>%{fullData.name}</extra>",
           marker: {
             size: 7,
             color: target?.color,
@@ -169,7 +181,7 @@ export default function TimeSeriesChart({
       referenceX: referenceSeries?.x || time || [],
       referenceLabels: referenceSeries?.labels || [],
     };
-  }, [time, series, selectedPoints, pointWindow, timeWindowSec, cssBlack, yReferenceLines]);
+  }, [time, series, selectedPoints, pointWindow, timeWindowSec, cssBlack, yReferenceLines, xTickFormatter]);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;

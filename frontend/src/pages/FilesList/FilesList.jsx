@@ -103,6 +103,17 @@ export default function FilesList() {
     localStorage.setItem("analysis_default_color", defaultColor);
   };
 
+  const updateGlobalParam = (key, value) => {
+    setParams((prev) => ({ ...prev, [key]: value }));
+    setParamsMap((prev) => {
+      const next = Object.fromEntries(
+        Object.entries(prev).map(([name, fileParams]) => [name, { ...fileParams, [key]: value }]),
+      );
+      localStorage.setItem("analysis_params_map", JSON.stringify(next));
+      return next;
+    });
+  };
+
   const analyze = async (names) => {
     if (!names.length) return;
     const filesToAnalyze = pendingFiles.filter((file) => names.includes(file.name));
@@ -191,7 +202,7 @@ export default function FilesList() {
               type="number"
               step="0.1"
               value={params.min_speed}
-              onChange={(e) => setParams((p) => ({ ...p, min_speed: Number(e.target.value) }))}
+              onChange={(e) => updateGlobalParam("min_speed", Number(e.target.value))}
               disabled={busy}
             />
           </label>
@@ -202,7 +213,7 @@ export default function FilesList() {
               type="number"
               step="0.1"
               value={params.bin_size}
-              onChange={(e) => setParams((p) => ({ ...p, bin_size: Number(e.target.value) }))}
+              onChange={(e) => updateGlobalParam("bin_size", Number(e.target.value))}
               disabled={busy}
             />
           </label>
@@ -213,7 +224,7 @@ export default function FilesList() {
               type="number"
               step="0.01"
               value={params.ci_z}
-              onChange={(e) => setParams((p) => ({ ...p, ci_z: Number(e.target.value) }))}
+              onChange={(e) => updateGlobalParam("ci_z", Number(e.target.value))}
               disabled={busy}
             />
           </label>

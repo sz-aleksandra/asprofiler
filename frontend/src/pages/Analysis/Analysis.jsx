@@ -59,7 +59,7 @@ export default function Analysis() {
       for (const rule of pointsSortRules) {
         let cmp = 0;
         if (rule.key === "name") cmp = String(a.name).localeCompare(String(b.name));
-        if (rule.key === "time") cmp = Number(a.time) - Number(b.time);
+        if (rule.key === "time") cmp = Number(getPointDisplayTime(a)) - Number(getPointDisplayTime(b));
         if (rule.key === "speed") cmp = Number(a.speed) - Number(b.speed);
         if (rule.key === "accel") cmp = Number(a.accel) - Number(b.accel);
         if (cmp !== 0) return rule.dir === "asc" ? cmp : -cmp;
@@ -67,7 +67,7 @@ export default function Analysis() {
       return 0;
     });
     return sorted;
-  }, [visibleSelectedPoints, pointsSortRules]);
+  }, [visibleSelectedPoints, pointsSortRules, timeMode, results]);
 
   const toggleSortRule = (key) => {
     setPointsSortRules((prev) => {
@@ -101,19 +101,15 @@ export default function Analysis() {
   const toKmh = (value) => Number(value) * 3.6;
   const speedSeriesFactor = speedSeriesUnit === "km/h" ? 3.6 : 1;
   const speedSeriesUnitLabel = speedSeriesUnit;
-  const formatSecondsDynamic = (value) => {
+  const formatSecondsClock = (value) => {
     if (value === undefined || value === null || Number.isNaN(value)) return "—";
     const totalSeconds = Number(value);
-    if (Math.abs(totalSeconds) < 60) return `${totalSeconds.toFixed(3).replace(/\.?0+$/, "")} s`;
     const sign = totalSeconds < 0 ? "-" : "";
     const safeSeconds = Math.abs(totalSeconds);
     const hours = Math.floor(safeSeconds / 3600);
     const minutes = Math.floor((safeSeconds % 3600) / 60);
     const seconds = Math.floor(safeSeconds % 60);
-    if (hours > 0) {
-      return `${sign}${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-    }
-    return `${sign}${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    return `${sign}${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   };
   const formatAbsoluteClock = (value) => {
     const raw = String(value || "").trim();
@@ -126,12 +122,8 @@ export default function Analysis() {
     if (!Number.isFinite(hours) || !Number.isFinite(minutes) || !Number.isFinite(seconds)) {
       return raw;
     }
-    const wholeSeconds = Number.isInteger(seconds)
-      ? String(seconds).padStart(2, "0")
-      : seconds.toFixed(3).padStart(6, "0").replace(/\.?0+$/, "");
-    if (hours > 0) return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${wholeSeconds}`;
-    if (minutes > 0) return `${String(minutes).padStart(2, "0")}:${wholeSeconds}`;
-    return `${wholeSeconds} s`;
+    const wholeSeconds = String(Math.floor(seconds)).padStart(2, "0");
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${wholeSeconds}`;
   };
   const formatSpeedPair = (value) => {
     if (value === undefined || value === null || Number.isNaN(value)) return "—";
@@ -163,11 +155,11 @@ export default function Analysis() {
     ) {
       return `${formatAbsoluteClock(timeseries.absolute_time[0])} -> ${formatAbsoluteClock(timeseries.absolute_time[timeseries.absolute_time.length - 1])}`;
     }
-    return formatSecondsDynamic(end - start);
+    return formatSecondsClock(end - start);
   };
   const formatPointTime = (point) => {
     if (timeMode === "absolute" && point?.absoluteTime) return formatAbsoluteClock(point.absoluteTime);
-    return formatSecondsDynamic(point?.time);
+    return formatSecondsClock(getPointDisplayTime(point));
   };
   const canUseAbsoluteTimeAxis =
     timeMode === "absolute" &&
@@ -177,7 +169,27 @@ export default function Analysis() {
         item.profile.timeseries.absolute_time.length > 0,
     );
   const formatTimeAxisTick = (value, label) =>
-    canUseAbsoluteTimeAxis && label ? formatAbsoluteClock(label) : formatSecondsDynamic(value);
+    canUseAbsoluteTimeAxis && label ? formatAbsoluteClock(label) : formatSecondsClock(value);
+
+  const getRelativeTimeAxis = (timeValues) => {
+    if (!Array.isArray(timeValues) || !timeValues.length) return [];
+    const first = Number(timeValues[0]);
+    if (!Number.isFinite(first)) return timeValues.map((value) => Number(value));
+    return timeValues.map((value) => Number(value) - first);
+  };
+  const getRelativePointTime = (name, rawTime) => {
+    const numericTime = Number(rawTime);
+    if (!Number.isFinite(numericTime)) return rawTime;
+    const item = results.find((entry) => entry.name === name);
+    const firstTime = Number(item?.profile?.timeseries?.time?.[0]);
+    if (!Number.isFinite(firstTime)) return numericTime;
+    return numericTime - firstTime;
+  };
+  const getPointDisplayTime = (point) => {
+    const rawTime = point?.rawTime ?? point?.time;
+    if (timeMode === "absolute") return rawTime;
+    return getRelativePointTime(point?.name, rawTime);
+  };
 
   const combinedTimeseries = useMemo(() => {
     const speedSeries = [];
@@ -193,8 +205,8 @@ export default function Analysis() {
           name: seriesName,
           values: ts.speed.map((value) => Number(value) * speedSeriesFactor),
           color,
-          x: ts.time,
-          labels: ts.absolute_time,
+          x: timeMode === "absolute" ? ts.time : getRelativeTimeAxis(ts.time),
+          labels: timeMode === "absolute" ? ts.absolute_time : [],
         });
       }
       if (ts?.time?.length && ts.acceleration?.length) {
@@ -202,14 +214,14 @@ export default function Analysis() {
           name: seriesName,
           values: ts.acceleration,
           color,
-          x: ts.time,
-          labels: ts.absolute_time,
+          x: timeMode === "absolute" ? ts.time : getRelativeTimeAxis(ts.time),
+          labels: timeMode === "absolute" ? ts.absolute_time : [],
         });
       }
     });
 
     return { speedSeries, accelerationSeries };
-  }, [visibleResults, colorMap, speedSeriesFactor]);
+  }, [visibleResults, colorMap, speedSeriesFactor, timeMode]);
   const speedReferenceLines = useMemo(
     () =>
       visibleResults
@@ -422,7 +434,15 @@ export default function Analysis() {
         });
         return prev.filter((p) => `${p.name}::${p.index}` !== key);
       }
-      return [...prev, { ...point, index: idx, time: t }];
+      return [
+        ...prev,
+        {
+          ...point,
+          index: idx,
+          time: t,
+          rawTime: t,
+        },
+      ];
     });
   };
   const onAspPointsSelect = (points) => {
@@ -439,7 +459,12 @@ export default function Analysis() {
           const key = `${point.name}::${idx}`;
           if (existing.has(key)) return null;
           existing.add(key);
-          return { ...point, index: idx, time: t };
+          return {
+            ...point,
+            index: idx,
+            time: t,
+            rawTime: t,
+          };
         })
         .filter(Boolean);
       if (!additions.length) return prev;
