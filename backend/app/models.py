@@ -10,7 +10,7 @@ class AnalyzeParams(BaseModel):
     bin_size: float = Field(0.2, gt=0)
     top_n: int = Field(2, ge=1)
     positive_only: bool = True
-    ci_z: float = Field(1.96, gt=0)
+    confidence_level: float = Field(0.95, gt=0, lt=1)
 
 class AnalyzeItemRequest(BaseModel):
     name: str

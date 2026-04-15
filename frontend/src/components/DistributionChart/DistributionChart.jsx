@@ -22,14 +22,15 @@ export default function DistributionChart({
 
     const normalized = traces.filter(Boolean).map((trace) => {
       if (trace.type === "violin") {
-        const baseColor = trace.line.color;
+        const baseColor = trace.line?.color;
         return {
           ...trace,
           line: {
-            width: 1.5,
+            width: 2,
             color: baseColor,
             ...(trace.line || {}),
           },
+          fillcolor: trace.fillcolor || "rgba(0,0,0,0)",
         };
       }
       return trace;
@@ -63,12 +64,18 @@ export default function DistributionChart({
       title: { text: title, font: { color: cssBlack } },
       font: { color: cssBlack },
       uirevision: title,
+      margin: { l: 50, r: 20, t: 40, b: 80 },
       showlegend: showLegend,
-      violinmode: violinMode ? "group" : undefined,
+      violinmode:
+        violinMode === true ? "group" : typeof violinMode === "string" ? violinMode : undefined,
       xaxis: xAxis,
       yaxis: yAxis,
       legend: {
         orientation: "h",
+        x: 0,
+        y: -0.22,
+        xanchor: "left",
+        yanchor: "top",
         font: { color: cssBlack },
       },
       coloraxis: colorAxis,

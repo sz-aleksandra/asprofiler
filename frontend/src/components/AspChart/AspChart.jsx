@@ -47,6 +47,7 @@ export default function AspChart({
       const base = colorMap?.[item.name];
       const profile = item.profile;
       const cutoff = Number(profile?.meta?.min_speed ?? 0);
+      const positiveOnly = Boolean(profile?.meta?.positive_only);
       const {
         time: tsTime = [],
         absolute_time: tsAbsoluteTime = [],
@@ -64,8 +65,10 @@ export default function AspChart({
       }));
 
       const sortedAll = [...all].sort((a, b) => a.speed - b.speed);
-      const included = sortedAll.filter((p) => p.speed >= cutoff);
-      const rejected = sortedAll.filter((p) => p.speed < cutoff);
+      const isIncluded = (point) =>
+        point.speed >= cutoff && (!positiveOnly || point.accel > 0);
+      const included = sortedAll.filter(isIncluded);
+      const rejected = sortedAll.filter((p) => !isIncluded(p));
       const selectedRaw = Array.isArray(profile?.points) ? profile.points : [];
       let selected = selectedRaw;
       if (!selected.every((p) => Number.isInteger(p?.index) && Number.isFinite(Number(p?.time)))) {

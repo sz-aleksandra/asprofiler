@@ -5,7 +5,7 @@ from io import StringIO
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.models import AnalyzeParams, AnalyzeResultsResponse
-from app.services.analysis import build_as_profile, load_series, load_series_stream
+from app.services.analysis import build_as_profile, load_series_stream
 
 router = APIRouter()
 logger = logging.getLogger("asp")
@@ -39,9 +39,18 @@ async def analyze_files(
         try:
             content = await uploaded.read()
             text = content.decode("utf-8-sig")
-            times, speeds, accels, absolute_times, total_rows = load_series_stream(StringIO(text))
+            times, speeds, accels, absolute_times, latitudes, longitudes, total_rows = load_series_stream(StringIO(text))
             logger.info("analyze transient %s rows=%d", name, total_rows)
-            profile = build_as_profile(times, speeds, accels, absolute_times, params, total_rows)
+            profile = build_as_profile(
+                times,
+                speeds,
+                accels,
+                absolute_times,
+                latitudes,
+                longitudes,
+                params,
+                total_rows,
+            )
             results.append({"name": name, "profile": profile})
         except HTTPException as exc:
             results.append({"name": name, "error": str(exc.detail)})

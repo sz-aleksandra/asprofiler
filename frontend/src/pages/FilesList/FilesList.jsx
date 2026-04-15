@@ -14,7 +14,7 @@ import styles from "./FilesList.module.css";
 const DEFAULT_PARAMS = {
   min_speed: 3,
   bin_size: 0.2,
-  ci_z: 1.96,
+  confidence_level: 0.95,
 };
 
 export default function FilesList() {
@@ -185,7 +185,6 @@ export default function FilesList() {
     () => [...pendingFiles].sort((a, b) => a.name.localeCompare(b.name)),
     [pendingFiles],
   );
-
   return (
     <section className={styles.page}>
       <h1 className={styles.title}>Files</h1>
@@ -196,7 +195,7 @@ export default function FilesList() {
         <div className={styles.sectionTitle}>Analysis preset</div>
         <div className={styles.controlRow}>
           <label className={styles.controlLabel}>
-            Min speed
+            Min speed (m/s)
             <input
               className={styles.controlInput}
               type="number"
@@ -207,7 +206,7 @@ export default function FilesList() {
             />
           </label>
           <label className={styles.controlLabel}>
-            Bin size
+            Bin size (m/s)
             <input
               className={styles.controlInput}
               type="number"
@@ -218,13 +217,15 @@ export default function FilesList() {
             />
           </label>
           <label className={styles.controlLabel}>
-            CI (z)
+            Confidence level
             <input
               className={styles.controlInput}
               type="number"
               step="0.01"
-              value={params.ci_z}
-              onChange={(e) => updateGlobalParam("ci_z", Number(e.target.value))}
+              min="0.01"
+              max="0.999"
+              value={params.confidence_level}
+              onChange={(e) => updateGlobalParam("confidence_level", Number(e.target.value))}
               disabled={busy}
             />
           </label>
@@ -337,7 +338,7 @@ export default function FilesList() {
                     />
                   </label>
                   <label className={styles.controlLabel}>
-                    Min speed
+                    Min speed (m/s)
                     <input
                       className={styles.controlInput}
                       type="number"
@@ -355,7 +356,7 @@ export default function FilesList() {
                     />
                   </label>
                   <label className={styles.controlLabel}>
-                    Bin size
+                    Bin size (m/s)
                     <input
                       className={styles.controlInput}
                       type="number"
@@ -373,16 +374,21 @@ export default function FilesList() {
                     />
                   </label>
                   <label className={styles.controlLabel}>
-                    CI (z)
+                    Confidence level
                     <input
                       className={styles.controlInput}
                       type="number"
                       step="0.01"
-                      value={perParams.ci_z}
+                      min="0.01"
+                      max="0.999999"
+                      value={perParams.confidence_level}
                       onChange={(e) => {
                         const next = {
                           ...paramsMap,
-                          [file.name]: { ...perParams, ci_z: Number(e.target.value) },
+                          [file.name]: {
+                            ...perParams,
+                            confidence_level: Number(e.target.value),
+                          },
                         };
                         setParamsMap(next);
                         localStorage.setItem("analysis_params_map", JSON.stringify(next));

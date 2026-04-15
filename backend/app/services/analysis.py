@@ -1,6 +1,6 @@
 import csv
 import math
-from pathlib import Path
+from statistics import NormalDist
 
 import numpy as np
 from fastapi import HTTPException
@@ -8,20 +8,15 @@ from fastapi import HTTPException
 from app.models import AnalyzeParams
 
 
-def load_series(
-    path: Path,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str] | None, int]:
-    with path.open("r", encoding="utf-8-sig", newline="") as f:
-        return load_series_stream(f)
-
-
 def load_series_stream(
     stream,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str] | None, int]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str] | None, list[float | None] | None, list[float | None] | None, int]:
     speeds = []
     accels = []
     times = []
     absolute_times = []
+    latitudes = []
+    longitudes = []
     total_rows = 0
     reader = csv.DictReader(stream)
     if reader.fieldnames is None:
@@ -40,6 +35,8 @@ def load_series_stream(
     absolute_time_col = field_map.get("absolute_time")
     speed_col = field_map["speed"]
     accel_col = field_map["acceleration"]
+    lat_col = field_map.get("lat")
+    lon_col = field_map.get("lon")
     for row in reader:
         total_rows += 1
         try:
@@ -60,6 +57,18 @@ def load_series_stream(
         times.append(t)
         if absolute_time_col:
             absolute_times.append(str(row.get(absolute_time_col, "") or "").strip())
+        if lat_col:
+            lat_raw = row.get(lat_col, "")
+            try:
+                latitudes.append(float(str(lat_raw).strip()))
+            except (ValueError, TypeError):
+                latitudes.append(None)
+        if lon_col:
+            lon_raw = row.get(lon_col, "")
+            try:
+                longitudes.append(float(str(lon_raw).strip()))
+            except (ValueError, TypeError):
+                longitudes.append(None)
 
     if not speeds:
         raise HTTPException(status_code=400, detail="No valid speed/accel rows found")
@@ -69,6 +78,8 @@ def load_series_stream(
         np.array(speeds, dtype=float),
         np.array(accels, dtype=float),
         absolute_times if absolute_time_col else None,
+        latitudes if lat_col and len(latitudes) == len(times) else None,
+        longitudes if lon_col and len(longitudes) == len(times) else None,
         total_rows,
     )
 
@@ -163,10 +174,16 @@ def _stats(arr: np.ndarray) -> dict:
     }
 
 
-def _curve_area(times: np.ndarray, values: np.ndarray) -> float:
+def _curve_area(times: np.ndarray, values: np.ndarray, absolute: bool = False) -> float:
     if len(times) < 2 or len(values) < 2:
         return 0.0
-    return float(np.trapz(values, x=times))
+    integrated_values = np.abs(values) if absolute else values
+    return float(np.trapz(integrated_values, x=times))
+
+
+def _confidence_level_to_z(confidence_level: float) -> float:
+    tail_probability = 0.5 + (float(confidence_level) / 2)
+    return float(NormalDist().inv_cdf(tail_probability))
 
 
 def build_as_profile(
@@ -174,6 +191,8 @@ def build_as_profile(
     speeds: np.ndarray,
     accels: np.ndarray,
     absolute_times: list[str] | None,
+    latitudes: list[float | None] | None,
+    longitudes: list[float | None] | None,
     params: AnalyzeParams,
     total_rows: int,
 ):
@@ -203,7 +222,8 @@ def build_as_profile(
         raise HTTPException(status_code=400, detail="Not enough points after binning")
 
     intercept, slope = _fit_line(x, y)
-    x2, y2 = _apply_ci_filter(x, y, intercept, slope, params.ci_z)
+    ci_z = _confidence_level_to_z(params.confidence_level)
+    x2, y2 = _apply_ci_filter(x, y, intercept, slope, ci_z)
     if len(x2) >= 2 and (len(x2) != len(x)):
         intercept, slope = _fit_line(x2, y2)
         x, y = x2, y2
@@ -246,6 +266,16 @@ def build_as_profile(
                 if absolute_times and len(absolute_times) == len(times)
                 else {}
             ),
+            **(
+                {"latitude": latitudes}
+                if latitudes and len(latitudes) == len(times)
+                else {}
+            ),
+            **(
+                {"longitude": longitudes}
+                if longitudes and len(longitudes) == len(times)
+                else {}
+            ),
         },
         "stats": {
             "speed": {
@@ -254,7 +284,7 @@ def build_as_profile(
             },
             "acceleration": {
                 **_stats(accels),
-                "area": _curve_area(times, accels),
+                "area": _curve_area(times, accels, absolute=True),
             },
         },
         "meta": {
@@ -265,7 +295,7 @@ def build_as_profile(
             "bin_size": float(params.bin_size),
             "top_n": int(params.top_n),
             "positive_only": bool(params.positive_only),
-            "ci_z": float(params.ci_z),
+            "confidence_level": float(params.confidence_level),
             "total_rows": int(total_rows),
         },
     }

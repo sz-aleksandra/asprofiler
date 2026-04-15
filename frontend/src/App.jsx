@@ -12,8 +12,6 @@ export default function App() {
         <Route path="/about" element={<About />} />
         <Route path="/files" element={<FilesList />} />
         <Route path="/analysis" element={<Analysis />} />
-        <Route path="/analyses" element={<Navigate to="/files" replace />} />
-        <Route path="/analyses/:analysisId" element={<Navigate to="/files" replace />} />
       </Route>
     </Routes>
   );

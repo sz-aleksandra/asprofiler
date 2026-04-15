@@ -233,7 +233,7 @@
 
 .reportRow {
   display: grid;
-  grid-template-columns: minmax(280px, 2fr) repeat(5, minmax(140px, 1fr));
+  grid-template-columns: 44px minmax(280px, 2fr) repeat(4, minmax(140px, 1fr)) 88px;
   gap: 10px;
   align-items: center;
   padding: 12px 14px;
@@ -256,12 +256,31 @@
   min-width: 0;
 }
 
-.reportCellModel,
+.reportCellToggle,
+.reportCellColor,
 .reportCellFit,
 .reportCellMetric {
   color: var(--black);
   font-variant-numeric: tabular-nums;
   text-align: left;
+}
+
+.reportCellToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reportCellColor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reportSummary {
+  padding: 10px 14px 4px;
+  font-size: 12px;
+  color: var(--black);
 }
 
 .statsCard {
@@ -362,6 +381,10 @@
   gap: 28px;
 }
 
+.timeseriesGridCompact {
+  gap: 8px;
+}
+
 .selectionSection {
   display: flex;
   flex-direction: column;
@@ -419,7 +442,8 @@
   align-items: center;
   gap: 6px;
   color: var(--black);
-  font-size: 13px;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .selectionInput {

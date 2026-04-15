@@ -101,17 +101,21 @@ export default function Analysis() {
   const toKmh = (value) => Number(value) * 3.6;
   const speedSeriesFactor = speedSeriesUnit === "km/h" ? 3.6 : 1;
   const speedSeriesUnitLabel = speedSeriesUnit;
-  const formatSecondsClock = (value) => {
+  const formatSecondsClock = (value, fractionDigits = 0) => {
     if (value === undefined || value === null || Number.isNaN(value)) return "—";
     const totalSeconds = Number(value);
     const sign = totalSeconds < 0 ? "-" : "";
     const safeSeconds = Math.abs(totalSeconds);
     const hours = Math.floor(safeSeconds / 3600);
     const minutes = Math.floor((safeSeconds % 3600) / 60);
-    const seconds = Math.floor(safeSeconds % 60);
-    return `${sign}${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    const secondsValue = safeSeconds % 60;
+    const secondsText =
+      fractionDigits > 0
+        ? secondsValue.toFixed(fractionDigits).padStart(3 + fractionDigits, "0")
+        : String(Math.floor(secondsValue)).padStart(2, "0");
+    return `${sign}${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${secondsText}`;
   };
-  const formatAbsoluteClock = (value) => {
+  const formatAbsoluteClock = (value, fractionDigits = 0) => {
     const raw = String(value || "").trim();
     if (!raw) return "—";
     const parts = raw.split(":");
@@ -122,16 +126,15 @@ export default function Analysis() {
     if (!Number.isFinite(hours) || !Number.isFinite(minutes) || !Number.isFinite(seconds)) {
       return raw;
     }
-    const wholeSeconds = String(Math.floor(seconds)).padStart(2, "0");
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${wholeSeconds}`;
+    const secondsText =
+      fractionDigits > 0
+        ? seconds.toFixed(fractionDigits).padStart(3 + fractionDigits, "0")
+        : String(Math.floor(seconds)).padStart(2, "0");
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${secondsText}`;
   };
   const formatSpeedPair = (value) => {
     if (value === undefined || value === null || Number.isNaN(value)) return "—";
     return `${Number(value).toFixed(3)} m/s (${toKmh(value).toFixed(3)} km/h)`;
-  };
-  const formatSpeedMs = (value) => {
-    if (value === undefined || value === null || Number.isNaN(value)) return "—";
-    return `${Number(value).toFixed(3)} m/s`;
   };
   const formatDistanceKm = (value) => {
     if (value === undefined || value === null || Number.isNaN(value)) return "—";
@@ -170,6 +173,10 @@ export default function Analysis() {
     );
   const formatTimeAxisTick = (value, label) =>
     canUseAbsoluteTimeAxis && label ? formatAbsoluteClock(label) : formatSecondsClock(value);
+  const formatTimeHoverLabel = (value, label) =>
+    canUseAbsoluteTimeAxis && label
+      ? formatAbsoluteClock(label, 1)
+      : formatSecondsClock(value, 1);
 
   const getRelativeTimeAxis = (timeValues) => {
     if (!Array.isArray(timeValues) || !timeValues.length) return [];
@@ -222,6 +229,7 @@ export default function Analysis() {
 
     return { speedSeries, accelerationSeries };
   }, [visibleResults, colorMap, speedSeriesFactor, timeMode]);
+  const xAxisTitle = canUseAbsoluteTimeAxis ? "Absolute time" : "Time from start";
   const speedReferenceLines = useMemo(
     () =>
       visibleResults
@@ -260,42 +268,56 @@ export default function Analysis() {
 
   const violinCharts = useMemo(() => {
     const buildMetricChart = ({ key, title, unit }) => {
-      const traces = visibleResults
+      const sharedBand = title;
+      const seriesItems = visibleResults
         .filter((item) => item.profile?.timeseries?.[key]?.length)
         .map((item) => {
-          const y = item.profile.timeseries[key].map((value) => Number(value));
+          const x = item.profile.timeseries[key].map((value) => Number(value));
           const color = colorMap[item.name];
           return {
+            values: x,
+            trace: {
             key: item.name,
             type: "violin",
             name: item.name,
-            x: new Array(y.length).fill(item.name),
-            y,
-            box: { visible: true },
-            meanline: { visible: true },
+            x,
+            y: new Array(x.length).fill(sharedBand),
+            orientation: "h",
+            side: "positive",
+            box: { visible: false },
+            meanline: { visible: false },
             points: false,
             hoveron: "kde",
             spanmode: "soft",
             scalemode: "width",
             line: { color },
-            fillcolor: hexToRgba(color, 0.4),
-            opacity: 0.9,
-            showlegend: false,
+            fillcolor: "rgba(0,0,0,0)",
+            opacity: 1,
+            showlegend: true,
+            },
           };
         });
 
+      const traces = seriesItems.map((item) => item.trace);
       if (!traces.length) return null;
+      const maxValue = Math.max(
+        0,
+        ...seriesItems.flatMap((item) => item.values).filter((value) => Number.isFinite(value)),
+      );
       return {
         key,
         title,
         traces,
-        violinMode: true,
+        violinMode: "overlay",
         xAxis: {
-          title: { text: "File" },
-          type: "category",
+          title: { text: unit },
+          type: "linear",
+          range: [0, maxValue],
         },
         yAxis: {
-          title: { text: unit },
+          title: { text: "" },
+          type: "category",
+          showticklabels: false,
         },
       };
     };
@@ -304,103 +326,6 @@ export default function Analysis() {
       buildMetricChart({ key: "acceleration", title: "Acceleration Distribution", unit: "m/s²" }),
       buildMetricChart({ key: "speed", title: "Speed Distribution", unit: "m/s" }),
     ].filter(Boolean);
-  }, [visibleResults, colorMap]);
-
-  const avHeatmaps = useMemo(() => {
-    const getFilteredPoints = (item) => item.profile?.all_points_filtered || [];
-    const allPoints = visibleResults.flatMap((item) => getFilteredPoints(item));
-    const allSpeed = allPoints.map((point) => Number(point.speed));
-    const allAccel = allPoints.map((point) => Number(point.accel));
-
-    if (!allSpeed.length || !allAccel.length) return [];
-
-    const minSpeed = Math.min(...allSpeed);
-    const maxSpeed = Math.max(...allSpeed);
-    const minAccel = Math.min(...allAccel);
-    const maxAccel = Math.max(...allAccel);
-    const binCount = 10;
-    const safeSpeedBinSize = Math.max((maxSpeed - minSpeed) / binCount, 0.1);
-    const safeAccelBinSize = Math.max((maxAccel - minAccel) / binCount, 0.05);
-
-    const getBinIndex = (value, start, size, count) => {
-      if (value <= start) return 0;
-      const raw = Math.floor((value - start) / size);
-      if (raw >= count) return count - 1;
-      return raw;
-    };
-
-    const maxBinCount = visibleResults.reduce((globalMax, item) => {
-      const bins = new Map();
-      getFilteredPoints(item).forEach((point) => {
-        const sx = Number(point.speed);
-        const ay = Number(point.accel);
-        const xBin = getBinIndex(sx, minSpeed, safeSpeedBinSize, binCount);
-        const yBin = getBinIndex(ay, minAccel, safeAccelBinSize, binCount);
-        const key = `${xBin}:${yBin}`;
-        bins.set(key, (bins.get(key) || 0) + 1);
-      });
-
-      const localMax = bins.size ? Math.max(...bins.values()) : 0;
-      return Math.max(globalMax, localMax);
-    }, 0);
-
-    return visibleResults
-      .map((item) => {
-        const counts = Array.from({ length: binCount }, () => Array(binCount).fill(0));
-
-        getFilteredPoints(item).forEach((point) => {
-          const sx = Number(point.speed);
-          const ay = Number(point.accel);
-          const xBin = getBinIndex(sx, minSpeed, safeSpeedBinSize, binCount);
-          const yBin = getBinIndex(ay, minAccel, safeAccelBinSize, binCount);
-          counts[yBin][xBin] += 1;
-        });
-
-        const flatCounts = counts.flat();
-        if (!flatCounts.some((value) => value > 0)) return null;
-
-        const x = Array.from(
-          { length: binCount },
-          (_, idx) => minSpeed + safeSpeedBinSize * idx + safeSpeedBinSize / 2,
-        );
-        const y = Array.from(
-          { length: binCount },
-          (_, idx) => minAccel + safeAccelBinSize * idx + safeAccelBinSize / 2,
-        );
-
-        return {
-          key: item.name,
-          title: `${item.name} Acceleration vs Speed`,
-          traces: [
-            {
-              type: "heatmap",
-              x,
-              y,
-              z: counts,
-              showscale: true,
-              coloraxis: "coloraxis",
-              zmin: 0,
-              zmax: maxBinCount,
-              xgap: 1,
-              ygap: 1,
-              hovertemplate:
-                "Speed bin center: %{x:.3f} m/s<br>Acceleration bin center: %{y:.3f} m/s²<br>Count: %{z}<extra></extra>",
-            },
-          ],
-          showLegend: false,
-          xAxis: {
-            title: { text: "Speed (m/s)" },
-            type: "linear",
-            range: [minSpeed, maxSpeed],
-          },
-          yAxis: {
-            title: { text: "Acceleration (m/s²)" },
-            type: "linear",
-            range: [minAccel, maxAccel],
-          },
-        };
-      })
-      .filter(Boolean);
   }, [visibleResults, colorMap]);
 
   const fmt = (v) =>
@@ -414,7 +339,6 @@ export default function Analysis() {
     if (metric === "acceleration") return { value: "m/s²", area: "m/s" };
     return { value: "", area: null };
   };
-  const xAxisTitle = canUseAbsoluteTimeAxis ? "Absolute time" : "Time from start";
   const allShown = results.length > 0 && results.every((r) => !hiddenMap[r.name]);
   const shownCount = results.filter((r) => !hiddenMap[r.name]).length;
   const speedViolinChart = violinCharts.find((chart) => chart.key === "speed");
@@ -493,14 +417,6 @@ export default function Analysis() {
           <div className={styles.drawerBackdropOpen} onClick={() => setToolsOpen(false)} />
           <aside className={styles.toolsDrawerOpen}>
             <AnalysisToolbar
-              results={results}
-              allShown={allShown}
-              shownCount={shownCount}
-              hiddenMap={hiddenMap}
-              setHiddenMap={setHiddenMap}
-              colorMap={colorMap}
-              colors={colors}
-              setColors={setColors}
               visibleSelectedPoints={visibleSelectedPoints}
               allPointsMarked={allPointsMarked}
               markedPointMap={markedPointMap}
@@ -515,10 +431,7 @@ export default function Analysis() {
               filteredSelectedPoints={filteredSelectedPoints}
               toggleSortRule={toggleSortRule}
               sortBadge={sortBadge}
-              speedSeriesUnit={speedSeriesUnit}
-              setSpeedSeriesUnit={setSpeedSeriesUnit}
               timeMode={timeMode}
-              setTimeMode={setTimeMode}
               formatSpeedPair={formatSpeedPair}
               formatPointTime={formatPointTime}
               fmt={fmt}
@@ -530,11 +443,15 @@ export default function Analysis() {
         results={results}
         visibleResults={visibleResults}
         colorMap={colorMap}
+        hiddenMap={hiddenMap}
+        setHiddenMap={setHiddenMap}
+        setColors={setColors}
+        allShown={allShown}
+        shownCount={shownCount}
         onAspPointSelect={onAspPointSelect}
         onAspPointsSelect={onAspPointsSelect}
         visibleSelectedPoints={visibleSelectedPoints}
         pointWindow={pointWindow}
-        avHeatmaps={avHeatmaps}
         combinedStatsRows={combinedStatsRows}
         metricUnits={metricUnits}
         fmtWithUnit={fmtWithUnit}
@@ -546,12 +463,16 @@ export default function Analysis() {
         accelerationViolinChart={accelerationViolinChart}
         fmt={fmt}
         formatSpeedPair={formatSpeedPair}
-        formatSpeedMs={formatSpeedMs}
         formatDistanceKm={formatDistanceKm}
         formatTimeSummary={formatTimeSummary}
         fitSlopeLabel={fitSlopeLabel}
         xTickFormatter={formatTimeAxisTick}
+        xHoverFormatter={formatTimeHoverLabel}
         speedSeriesUnitLabel={speedSeriesUnitLabel}
+        speedSeriesUnit={speedSeriesUnit}
+        setSpeedSeriesUnit={setSpeedSeriesUnit}
+        timeMode={timeMode}
+        setTimeMode={setTimeMode}
       />
     </section>
   );

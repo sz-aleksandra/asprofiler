@@ -11,18 +11,65 @@ export default function TimeSeriesChart({
   time,
   series,
   xTitle = "Time series",
+  xIncludeZero = false,
   xTickFormatter,
+  xHoverFormatter,
   selectedPoints,
   pointWindow,
   timeWindowSec,
   yReferenceLines = [],
 }) {
   const containerRef = useRef(null);
+  const applyingTicksRef = useRef(false);
+  const lastTickSignatureRef = useRef("");
   const cssBlack = getCssVar("--black");
+  const buildTickConfig = (referenceX, referenceLabels, minX, maxX) => {
+    if (
+      typeof xTickFormatter !== "function" ||
+      !Array.isArray(referenceX) ||
+      referenceX.length === 0
+    ) {
+      return null;
+    }
+
+    const points = referenceX
+      .map((value, index) => ({ value: Number(value), index }))
+      .filter(({ value }) => Number.isFinite(value))
+      .filter(({ value }) =>
+        Number.isFinite(minX) && Number.isFinite(maxX) ? value >= minX && value <= maxX : true,
+      );
+
+    const sourceIndexes = (points.length ? points : referenceX.map((value, index) => ({ value, index }))).map(
+      ({ index }) => index,
+    );
+    if (!sourceIndexes.length) return null;
+
+    const maxTicks = Math.min(10, sourceIndexes.length);
+    const tickIndexes = Array.from(
+      { length: maxTicks },
+      (_, idx) =>
+        sourceIndexes[Math.round((idx * (sourceIndexes.length - 1)) / Math.max(maxTicks - 1, 1))],
+    );
+    const uniqueIndexes = [...new Set(tickIndexes)];
+    const tickvals = uniqueIndexes.map((idx) => Number(referenceX[idx]));
+    const ticktext = uniqueIndexes.map((idx) =>
+      xTickFormatter(Number(referenceX[idx]), referenceLabels?.[idx], idx),
+    );
+
+    return {
+      tickmode: "array",
+      tickvals,
+      ticktext,
+      signature: JSON.stringify([tickvals, ticktext]),
+    };
+  };
 
   const plotData = useMemo(() => {
     if (!series?.length) return null;
     const getHoverTimeLabel = (xValue, label, index) => {
+      if (typeof xHoverFormatter === "function") {
+        return xHoverFormatter(Number(xValue), label, index);
+      }
       if (typeof xTickFormatter === "function") {
         return xTickFormatter(Number(xValue), label, index);
       }
@@ -181,7 +228,7 @@ export default function TimeSeriesChart({
       referenceX: referenceSeries?.x || time || [],
       referenceLabels: referenceSeries?.labels || [],
     };
-  }, [time, series, selectedPoints, pointWindow, timeWindowSec, cssBlack, yReferenceLines, xTickFormatter]);
+  }, [time, series, selectedPoints, pointWindow, timeWindowSec, cssBlack, yReferenceLines, xTickFormatter, xHoverFormatter]);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;
@@ -196,6 +243,7 @@ export default function TimeSeriesChart({
         title: { text: xTitle, font: { color: cssBlack } },
         tickfont: { color: cssBlack },
         type: "linear",
+        rangemode: xIncludeZero ? "tozero" : undefined,
       },
       yaxis: {
         title: { text: yTitle || title, font: { color: cssBlack } },
@@ -213,18 +261,12 @@ export default function TimeSeriesChart({
       },
     };
 
-    if (typeof xTickFormatter === "function" && Array.isArray(plotData.referenceX) && plotData.referenceX.length) {
-      const maxTicks = Math.min(8, plotData.referenceX.length);
-      const tickIndexes = Array.from(
-        { length: maxTicks },
-        (_, idx) => Math.round((idx * (plotData.referenceX.length - 1)) / Math.max(maxTicks - 1, 1)),
-      );
-      const uniqueIndexes = [...new Set(tickIndexes)];
-      layout.xaxis.tickmode = "array";
-      layout.xaxis.tickvals = uniqueIndexes.map((idx) => Number(plotData.referenceX[idx]));
-      layout.xaxis.ticktext = uniqueIndexes.map((idx) =>
-        xTickFormatter(Number(plotData.referenceX[idx]), plotData.referenceLabels?.[idx], idx),
-      );
+    const initialTickConfig = buildTickConfig(plotData.referenceX, plotData.referenceLabels);
+    if (initialTickConfig) {
+      lastTickSignatureRef.current = initialTickConfig.signature;
+      layout.xaxis.tickmode = initialTickConfig.tickmode;
+      layout.xaxis.tickvals = initialTickConfig.tickvals;
+      layout.xaxis.ticktext = initialTickConfig.ticktext;
     }
 
     const config = {
@@ -233,10 +275,44 @@ export default function TimeSeriesChart({
     };
     Plotly.react(node, plotData.traces, layout, config);
 
+    const onRelayout = (event) => {
+      if (applyingTicksRef.current) {
+        applyingTicksRef.current = false;
+        return;
+      }
+
+      if (typeof xTickFormatter !== "function") return;
+
+      const minX = Number(event?.["xaxis.range[0]"]);
+      const maxX = Number(event?.["xaxis.range[1]"]);
+      const nextTickConfig =
+        event?.["xaxis.autorange"] === true
+          ? buildTickConfig(plotData.referenceX, plotData.referenceLabels)
+          : buildTickConfig(plotData.referenceX, plotData.referenceLabels, minX, maxX);
+
+      if (!nextTickConfig || nextTickConfig.signature === lastTickSignatureRef.current) return;
+
+      lastTickSignatureRef.current = nextTickConfig.signature;
+      applyingTicksRef.current = true;
+      Plotly.relayout(node, {
+        "xaxis.tickmode": nextTickConfig.tickmode,
+        "xaxis.tickvals": nextTickConfig.tickvals,
+        "xaxis.ticktext": nextTickConfig.ticktext,
+      }).catch(() => {
+        applyingTicksRef.current = false;
+      });
+    };
+    node.on("plotly_relayout", onRelayout);
+
     const ro = new ResizeObserver(() => Plotly.Plots.resize(node));
     ro.observe(node);
-    return () => ro.disconnect();
-  }, [plotData, title, xTitle, yTitle, xTickFormatter]);
+    return () => {
+      if (typeof node.removeListener === "function") {
+        node.removeListener("plotly_relayout", onRelayout);
+      }
+      ro.disconnect();
+    };
+  }, [plotData, title, xTitle, yTitle, xTickFormatter, xIncludeZero]);
 
   if (!plotData) return null;
 

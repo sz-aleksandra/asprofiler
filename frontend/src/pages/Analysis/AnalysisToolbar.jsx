@@ -1,14 +1,6 @@
 import styles from "./Analysis.module.css";
 
 export default function AnalysisToolbar({
-  results,
-  allShown,
-  shownCount,
-  hiddenMap,
-  setHiddenMap,
-  colorMap,
-  colors,
-  setColors,
   visibleSelectedPoints,
   allPointsMarked,
   markedPointMap,
@@ -23,109 +15,13 @@ export default function AnalysisToolbar({
   filteredSelectedPoints,
   toggleSortRule,
   sortBadge,
-  speedSeriesUnit,
-  setSpeedSeriesUnit,
   timeMode,
-  setTimeMode,
   formatSpeedPair,
   formatPointTime,
   fmt,
 }) {
   return (
     <div className={styles.controls}>
-      <div className={styles.drawerSection}>
-        <div className={styles.drawerSectionTitle}>Files</div>
-        <div className={styles.toolbar}>
-          <div className={styles.toolbarLeft}>
-            <label className={styles.selectAll}>
-              <input
-                type="checkbox"
-                checked={allShown}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setHiddenMap({});
-                    return;
-                  }
-                  const next = {};
-                  results.forEach((r) => {
-                    next[r.name] = true;
-                  });
-                  setHiddenMap(next);
-                }}
-              />
-              <span>Show all</span>
-            </label>
-            <span className={styles.count}>
-              {results.length} files · {shownCount} shown
-            </span>
-          </div>
-        </div>
-        <div className={styles.table}>
-          <div className={`${styles.row} ${styles.toolbarFilesRow} ${styles.head}`}>
-            <div className={styles.cellCheckbox}>Show</div>
-            <div className={styles.cellName}>Filename</div>
-            <div className={styles.cellColor}>Color</div>
-          </div>
-          {results.map((item) => (
-            <div className={`${styles.row} ${styles.toolbarFilesRow}`} key={item.name}>
-              <div className={styles.cellCheckbox}>
-                <input
-                  type="checkbox"
-                  checked={!hiddenMap[item.name]}
-                  onChange={(e) => {
-                    setHiddenMap((prev) => ({
-                      ...prev,
-                      [item.name]: !e.target.checked,
-                    }));
-                  }}
-                />
-              </div>
-              <div className={styles.cellName}>{item.name}</div>
-              <div className={styles.cellColor}>
-                <input
-                  type="color"
-                  className={styles.colorInput}
-                  value={colorMap[item.name]}
-                  onChange={(e) => {
-                    setColors((prev) => ({ ...prev, [item.name]: e.target.value }));
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className={styles.drawerSection}>
-        <div className={styles.drawerSectionTitle}>Display</div>
-        <div className={styles.toolbar}>
-          <div className={styles.selectionControls}>
-            <label className={styles.selectionLabel}>
-              Speed chart
-              <select
-                className={styles.selectionSelect}
-                value={speedSeriesUnit}
-                onChange={(e) => setSpeedSeriesUnit(e.target.value)}
-              >
-                <option value="m/s">m/s</option>
-                <option value="km/h">km/h</option>
-              </select>
-            </label>
-            <label className={styles.selectionLabel}>
-              Time display
-              <select
-                className={styles.selectionSelect}
-                value={timeMode}
-                onChange={(e) => setTimeMode(e.target.value)}
-              >
-                <option value="relative">Relative</option>
-                <option value="absolute">Absolute</option>
-              </select>
-            </label>
-          </div>
-        </div>
-      </div>
-
       <div className={styles.drawerSection}>
         <div className={styles.drawerSectionTitle}>Selected Points</div>
         <div className={styles.selectionSection}>

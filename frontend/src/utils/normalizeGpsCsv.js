@@ -1,10 +1,17 @@
 const RAW_TIME_COL = "Time";
 const RAW_SPEED_COL = "Speed (m/s)";
-const RAW_ACCEL_COL = "Instantaneous Acceleration Impulse";
+const RAW_LAT_COL = "Lat";
+const RAW_LON_COL = "Lon";
+const RAW_HACC_COL = "Hacc";
+const RAW_HDOP_COL = "Hdop";
 const NORMALIZED_TIME_COL = "time";
 const NORMALIZED_ABSOLUTE_TIME_COL = "absolute_time";
 const NORMALIZED_SPEED_COL = "speed";
 const NORMALIZED_ACCEL_COL = "acceleration";
+const NORMALIZED_LAT_COL = "lat";
+const NORMALIZED_LON_COL = "lon";
+const MAX_HACC = 2;
+const MAX_HDOP = 0.5;
 
 function parseCsvLine(line) {
   const cells = [];
@@ -79,6 +86,53 @@ function toCsvLine(values) {
     .join(",");
 }
 
+function parseNumericCell(value) {
+  const normalized = String(value ?? "")
+    .trim()
+    .replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+function rollingWindow(values, windowSize, reducer) {
+  const radius = Math.floor(windowSize / 2);
+  return values.map((_, index) => {
+    const start = Math.max(0, index - radius);
+    const end = Math.min(values.length, index + radius + 1);
+    return reducer(values.slice(start, end));
+  });
+}
+
+function mean(values) {
+  if (!values.length) return NaN;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function median(values) {
+  if (!values.length) return NaN;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  return sorted[mid];
+}
+
+function computeDvDt(times, velocities) {
+  return velocities.map((velocity, index) => {
+    if (index === 0) return 0;
+    const dt = times[index] - times[index - 1];
+    if (!Number.isFinite(dt) || dt <= 0) return 0;
+    return (velocity - velocities[index - 1]) / dt;
+  });
+}
+
+function averageNullable(values) {
+  const finite = values.filter((value) => Number.isFinite(value));
+  if (!finite.length) return null;
+  return mean(finite);
+}
+
 export async function normalizeGpsCsvFile(file) {
   const text = await file.text();
   const rows = parseCsv(text);
@@ -87,18 +141,92 @@ export async function normalizeGpsCsvFile(file) {
   }
 
   const headers = rows[0];
-  const timeIndex = getFieldIndex(headers, [RAW_TIME_COL, NORMALIZED_TIME_COL]);
-  const absoluteTimeIndex = getFieldIndex(headers, [NORMALIZED_ABSOLUTE_TIME_COL]);
-  const speedIndex = getFieldIndex(headers, [RAW_SPEED_COL, NORMALIZED_SPEED_COL]);
-  const accelIndex = getFieldIndex(headers, [RAW_ACCEL_COL, NORMALIZED_ACCEL_COL]);
-  if (timeIndex < 0 || speedIndex < 0 || accelIndex < 0) {
-    throw new Error("CSV must contain time, speed and acceleration columns");
+  const timeIndex = getFieldIndex(headers, [RAW_TIME_COL]);
+  const speedIndex = getFieldIndex(headers, [RAW_SPEED_COL]);
+  const latIndex = getFieldIndex(headers, [RAW_LAT_COL]);
+  const lonIndex = getFieldIndex(headers, [RAW_LON_COL]);
+  const haccIndex = getFieldIndex(headers, [RAW_HACC_COL]);
+  const hdopIndex = getFieldIndex(headers, [RAW_HDOP_COL]);
+  if (timeIndex < 0 || speedIndex < 0) {
+    throw new Error("CSV must contain time and speed columns");
   }
 
-  const rawSpeedHeader = headers[speedIndex]?.trim().toLowerCase() === RAW_SPEED_COL.toLowerCase();
-  const rawAccelHeader = headers[accelIndex]?.trim().toLowerCase() === RAW_ACCEL_COL.toLowerCase();
-  const rawTimeHeader = headers[timeIndex]?.trim().toLowerCase() === RAW_TIME_COL.toLowerCase();
-  const treatAsRaw = rawTimeHeader && (rawSpeedHeader || rawAccelHeader);
+  const normalizedRows = [];
+  let firstTimeSec = null;
+
+  for (const row of rows.slice(1)) {
+    try {
+      const tRaw = String(row[timeIndex] ?? "").trim();
+      const s = parseNumericCell(row[speedIndex]);
+      const lat = latIndex >= 0 ? parseNumericCell(row[latIndex]) : NaN;
+      const lon = lonIndex >= 0 ? parseNumericCell(row[lonIndex]) : NaN;
+      const hacc = haccIndex >= 0 ? parseNumericCell(row[haccIndex]) : NaN;
+      const hdop = hdopIndex >= 0 ? parseNumericCell(row[hdopIndex]) : NaN;
+      if (!Number.isFinite(s)) {
+        continue;
+      }
+      if (Number.isFinite(hacc) && hacc > MAX_HACC) {
+        continue;
+      }
+      if (Number.isFinite(hdop) && hdop > MAX_HDOP) {
+        continue;
+      }
+
+      let tSec = parseTimeToSeconds(tRaw);
+      if (firstTimeSec === null) firstTimeSec = tSec;
+      tSec -= firstTimeSec;
+
+      normalizedRows.push({
+        time: tSec,
+        absoluteTime: tRaw,
+        rawSpeed: s,
+        latitude: Number.isFinite(lat) ? lat : null,
+        longitude: Number.isFinite(lon) ? lon : null,
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!normalizedRows.length) {
+    throw new Error("No valid rows found after preprocessing");
+  }
+
+  const groupedRows = Array.from(
+    normalizedRows
+      .reduce((groups, row) => {
+        const key = row.time.toFixed(6);
+        const list = groups.get(key) || [];
+        list.push(row);
+        groups.set(key, list);
+        return groups;
+      }, new Map())
+      .entries(),
+  )
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([, rowsAtTime]) => {
+      const firstRow = rowsAtTime[0];
+      const time = mean(rowsAtTime.map((row) => row.time));
+      return {
+        time,
+        formattedTime: time.toFixed(3),
+        absoluteTime: firstRow.absoluteTime,
+        rawSpeed: mean(rowsAtTime.map((row) => row.rawSpeed)),
+        latitude: averageNullable(rowsAtTime.map((row) => row.latitude)),
+        longitude: averageNullable(rowsAtTime.map((row) => row.longitude)),
+      };
+    });
+
+  const speedMedian = rollingWindow(
+    groupedRows.map((row) => row.rawSpeed),
+    5,
+    median,
+  );
+  const velocityMedianMean = rollingWindow(speedMedian, 5, mean);
+  const dvDt = computeDvDt(
+    groupedRows.map((row) => row.time),
+    velocityMedianMean,
+  );
 
   const outputLines = [
     toCsvLine([
@@ -106,52 +234,25 @@ export async function normalizeGpsCsvFile(file) {
       NORMALIZED_ABSOLUTE_TIME_COL,
       NORMALIZED_SPEED_COL,
       NORMALIZED_ACCEL_COL,
+      NORMALIZED_LAT_COL,
+      NORMALIZED_LON_COL,
     ]),
   ];
-  const seenRows = new Set();
-  let firstTimeSec = null;
-  let keptRows = 0;
 
-  for (const row of rows.slice(1)) {
-    try {
-      const tRaw = String(row[timeIndex] ?? "").trim();
-      const absoluteTimeRaw = String(row[absoluteTimeIndex] ?? "").trim();
-      const s = Number(String(row[speedIndex] ?? "").trim());
-      const a = Number(String(row[accelIndex] ?? "").trim());
-      if (!Number.isFinite(s) || !Number.isFinite(a)) {
-        continue;
-      }
-
-      let tSec;
-      if (treatAsRaw) {
-        tSec = parseTimeToSeconds(tRaw);
-        if (firstTimeSec === null) firstTimeSec = tSec;
-        tSec -= firstTimeSec;
-      } else {
-        tSec = Number(tRaw);
-        if (!Number.isFinite(tSec)) continue;
-      }
-
-      const formattedTime = tSec.toFixed(3);
-      const key = `${formattedTime}|${s}|${a}`;
-      if (seenRows.has(key)) {
-        continue;
-      }
-      seenRows.add(key);
-
-      const absoluteTime = treatAsRaw ? tRaw : absoluteTimeRaw;
-      outputLines.push(
-        toCsvLine([formattedTime, absoluteTime, s.toFixed(6), a.toFixed(6)]),
-      );
-      keptRows += 1;
-    } catch {
-      // skip invalid rows to match script behavior
-    }
-  }
-
-  if (!keptRows) {
-    throw new Error("No valid rows found after preprocessing");
-  }
+  groupedRows.forEach((row, index) => {
+    const filteredSpeed = velocityMedianMean[index];
+    const derivedAcceleration = dvDt[index];
+    outputLines.push(
+      toCsvLine([
+        row.formattedTime,
+        row.absoluteTime,
+        filteredSpeed.toFixed(6),
+        derivedAcceleration.toFixed(6),
+        row.latitude ?? "",
+        row.longitude ?? "",
+      ]),
+    );
+  });
 
   return new File([`${outputLines.join("\n")}\n`], file.name, {
     type: "text/csv",
