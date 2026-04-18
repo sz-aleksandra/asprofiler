@@ -2,8 +2,16 @@ import logging
 import json
 from io import StringIO
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from pydantic import BaseModel
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 
+from app.auth import (
+    is_auth_configured,
+    is_cookie_valid,
+    require_authenticated_user,
+    set_auth_cookie,
+    verify_password,
+)
 from app.models import AnalyzeParams, AnalyzeResultsResponse
 from app.services.analysis import build_as_profile, load_series_stream
 
@@ -11,8 +19,38 @@ router = APIRouter()
 logger = logging.getLogger("asp")
 
 
+class LoginPayload(BaseModel):
+    password: str = ""
+
+
 @router.get("/health")
 def health():
+    return {"ok": True}
+
+
+@router.get("/auth/session")
+def auth_session(request: Request):
+    auth_cookie = request.cookies.get("asprofiler_session")
+    configured = is_auth_configured()
+    authenticated = configured and is_cookie_valid(auth_cookie)
+    return {"ok": True, "configured": configured, "authenticated": authenticated}
+
+
+@router.post("/auth/login")
+def auth_login(payload: LoginPayload, request: Request, response: Response):
+    if not is_auth_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication is not configured",
+        )
+
+    if not verify_password(payload.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid password",
+        )
+
+    set_auth_cookie(response, request)
     return {"ok": True}
 
 
@@ -20,6 +58,7 @@ def health():
 async def analyze_files(
     files: list[UploadFile] = File(...),
     params_json: str = File("{}"),
+    _auth=Depends(require_authenticated_user),
 ):
     if not files:
         raise HTTPException(status_code=400, detail="No files selected")

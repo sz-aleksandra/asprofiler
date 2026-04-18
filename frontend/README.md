@@ -14,3 +14,14 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## Password gate
+
+To enable the backend-backed password gate:
+
+1. Copy `backend/.env.example` to `backend/.env`.
+2. Set `APP_PASSWORD` and `APP_SESSION_SECRET`.
+3. Make sure `APP_CORS_ORIGINS` includes your frontend origin.
+4. Restart the backend after changing the value.
+
+The frontend now logs in against the backend and stores the session in an `HttpOnly` cookie.
