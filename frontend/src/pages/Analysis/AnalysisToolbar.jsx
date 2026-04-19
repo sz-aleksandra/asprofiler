@@ -7,10 +7,10 @@ export default function AnalysisToolbar({
   setMarkedPointMap,
   pointKey,
   selectedVisibleCount,
-  pointWindow,
-  setPointWindow,
-  timeWindowSec,
-  setTimeWindowSec,
+  pointsBefore,
+  setPointsBefore,
+  pointsAfter,
+  setPointsAfter,
   setSelectedPoints,
   filteredSelectedPoints,
   toggleSortRule,
@@ -60,25 +60,25 @@ export default function AnalysisToolbar({
             </div>
             <div className={styles.selectionControls}>
               <label className={styles.selectionLabel}>
-                +/- points
+                Points before
                 <input
                   className={styles.selectionInput}
                   type="number"
                   min={0}
                   step={1}
-                  value={pointWindow}
-                  onChange={(e) => setPointWindow(Math.max(0, Number(e.target.value) || 0))}
+                  value={pointsBefore}
+                  onChange={(e) => setPointsBefore(Math.max(0, Number(e.target.value) || 0))}
                 />
               </label>
               <label className={styles.selectionLabel}>
-                +/- seconds
+                Points after
                 <input
                   className={styles.selectionInput}
                   type="number"
                   min={0}
-                  step={0.1}
-                  value={timeWindowSec}
-                  onChange={(e) => setTimeWindowSec(Math.max(0, Number(e.target.value) || 0))}
+                  step={1}
+                  value={pointsAfter}
+                  onChange={(e) => setPointsAfter(Math.max(0, Number(e.target.value) || 0))}
                 />
               </label>
               <button

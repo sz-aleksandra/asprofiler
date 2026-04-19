@@ -3,15 +3,15 @@ const RAW_SPEED_COL = "Speed (m/s)";
 const RAW_LAT_COL = "Lat";
 const RAW_LON_COL = "Lon";
 const RAW_HACC_COL = "Hacc";
-const RAW_HDOP_COL = "Hdop";
 const NORMALIZED_TIME_COL = "time";
 const NORMALIZED_ABSOLUTE_TIME_COL = "absolute_time";
 const NORMALIZED_SPEED_COL = "speed";
 const NORMALIZED_ACCEL_COL = "acceleration";
 const NORMALIZED_LAT_COL = "lat";
 const NORMALIZED_LON_COL = "lon";
-const MAX_HACC = 2;
-const MAX_HDOP = 0.5;
+const DEFAULT_FILTER_WINDOW = 5;
+const DEFAULT_HACC_THRESHOLD = 2;
+const DEFAULT_FILTER_MODE = "median_mean";
 
 function parseCsvLine(line) {
   const cells = [];
@@ -133,7 +133,11 @@ function averageNullable(values) {
   return mean(finite);
 }
 
-export async function normalizeGpsCsvFile(file) {
+export async function normalizeGpsCsvFile(file, options = {}) {
+  const filterWindow = Math.max(1, Math.floor(Number(options.filterWindow) || DEFAULT_FILTER_WINDOW));
+  const haccThreshold = Number(options.haccThreshold);
+  const maxHacc = Number.isFinite(haccThreshold) ? haccThreshold : DEFAULT_HACC_THRESHOLD;
+  const filterMode = String(options.filterMode || DEFAULT_FILTER_MODE);
   const text = await file.text();
   const rows = parseCsv(text);
   if (!rows.length) {
@@ -146,7 +150,6 @@ export async function normalizeGpsCsvFile(file) {
   const latIndex = getFieldIndex(headers, [RAW_LAT_COL]);
   const lonIndex = getFieldIndex(headers, [RAW_LON_COL]);
   const haccIndex = getFieldIndex(headers, [RAW_HACC_COL]);
-  const hdopIndex = getFieldIndex(headers, [RAW_HDOP_COL]);
   if (timeIndex < 0 || speedIndex < 0) {
     throw new Error("CSV must contain time and speed columns");
   }
@@ -161,14 +164,10 @@ export async function normalizeGpsCsvFile(file) {
       const lat = latIndex >= 0 ? parseNumericCell(row[latIndex]) : NaN;
       const lon = lonIndex >= 0 ? parseNumericCell(row[lonIndex]) : NaN;
       const hacc = haccIndex >= 0 ? parseNumericCell(row[haccIndex]) : NaN;
-      const hdop = hdopIndex >= 0 ? parseNumericCell(row[hdopIndex]) : NaN;
       if (!Number.isFinite(s)) {
         continue;
       }
-      if (Number.isFinite(hacc) && hacc > MAX_HACC) {
-        continue;
-      }
-      if (Number.isFinite(hdop) && hdop > MAX_HDOP) {
+      if (Number.isFinite(hacc) && hacc > maxHacc) {
         continue;
       }
 
@@ -217,15 +216,23 @@ export async function normalizeGpsCsvFile(file) {
       };
     });
 
-  const speedMedian = rollingWindow(
-    groupedRows.map((row) => row.rawSpeed),
-    5,
-    median,
-  );
-  const velocityMedianMean = rollingWindow(speedMedian, 5, mean);
+  const rawSpeeds = groupedRows.map((row) => row.rawSpeed);
+  let filteredSpeeds = rawSpeeds;
+
+  if (filterWindow > 1) {
+    if (filterMode === "median") {
+      filteredSpeeds = rollingWindow(rawSpeeds, filterWindow, median);
+    } else if (filterMode === "mean") {
+      filteredSpeeds = rollingWindow(rawSpeeds, filterWindow, mean);
+    } else if (filterMode === "median_mean") {
+      const speedMedian = rollingWindow(rawSpeeds, filterWindow, median);
+      filteredSpeeds = rollingWindow(speedMedian, filterWindow, mean);
+    }
+  }
+
   const dvDt = computeDvDt(
     groupedRows.map((row) => row.time),
-    velocityMedianMean,
+    filteredSpeeds,
   );
 
   const outputLines = [
@@ -240,7 +247,7 @@ export async function normalizeGpsCsvFile(file) {
   ];
 
   groupedRows.forEach((row, index) => {
-    const filteredSpeed = velocityMedianMean[index];
+    const filteredSpeed = filteredSpeeds[index];
     const derivedAcceleration = dvDt[index];
     outputLines.push(
       toCsvLine([

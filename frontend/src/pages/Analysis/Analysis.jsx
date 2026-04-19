@@ -37,13 +37,61 @@ export default function Analysis() {
   const [hiddenMap, setHiddenMap] = useState({});
   const [selectedPoints, setSelectedPoints] = useState([]);
   const [markedPointMap, setMarkedPointMap] = useState({});
-  const [pointWindow, setPointWindow] = useState(10);
-  const [timeWindowSec, setTimeWindowSec] = useState(10);
+  const [pointsBefore, setPointsBefore] = useState(10);
+  const [pointsAfter, setPointsAfter] = useState(10);
   const [pointsSortRules, setPointsSortRules] = useState([]);
   const [speedSeriesUnit, setSpeedSeriesUnit] = useState(
     () => localStorage.getItem("analysis_speed_series_unit") || "m/s",
   );
   const [timeMode, setTimeMode] = useState(() => localStorage.getItem("analysis_time_mode") || "relative");
+  const [distributionScale, setDistributionScale] = useState(
+    () => localStorage.getItem("analysis_distribution_scale") || "linear",
+  );
+  const analysisParams = useMemo(() => {
+    const defaults = {
+      min_speed: 3,
+      bin_size: 0.2,
+      top_n: 2,
+      confidence_level: 0.95,
+    };
+    try {
+      const raw = localStorage.getItem("analysis_params");
+      if (raw) return { ...defaults, ...JSON.parse(raw) };
+    } catch {
+      // ignore
+    }
+    return defaults;
+  }, []);
+  const preprocessing = useMemo(() => {
+    const defaults = {
+      filter_window: 5,
+      filter_mode: "median_mean",
+      hacc_threshold: 2,
+    };
+    if (analysisState?.preprocessing) {
+      return { ...defaults, ...analysisState.preprocessing };
+    }
+    try {
+      const raw = localStorage.getItem("analysis_preprocessing");
+      if (raw) return { ...defaults, ...JSON.parse(raw) };
+    } catch {
+      // ignore
+    }
+    return defaults;
+  }, [analysisState]);
+  const getRelativePointTime = (name, rawTime) => {
+    const numericTime = Number(rawTime);
+    if (!Number.isFinite(numericTime)) return rawTime;
+    const item = results.find((entry) => entry.name === name);
+    const firstTime = Number(item?.profile?.timeseries?.time?.[0]);
+    if (!Number.isFinite(firstTime)) return numericTime;
+    return numericTime - firstTime;
+  };
+  const getPointDisplayTime = (point) => {
+    const rawTime = point?.rawTime ?? point?.time;
+    if (timeMode === "absolute") return rawTime;
+    return getRelativePointTime(point?.name, rawTime);
+  };
   const visibleResults = results.filter((r) => !hiddenMap[r.name]);
   const pointKey = (p) => `${p.name}::${p.index}`;
   const visibleFileNames = new Set(visibleResults.map((r) => r.name));
@@ -97,6 +145,10 @@ export default function Analysis() {
   useEffect(() => {
     localStorage.setItem("analysis_speed_series_unit", speedSeriesUnit);
   }, [speedSeriesUnit]);
+
+  useEffect(() => {
+    localStorage.setItem("analysis_distribution_scale", distributionScale);
+  }, [distributionScale]);
 
   const toKmh = (value) => Number(value) * 3.6;
   const speedSeriesFactor = speedSeriesUnit === "km/h" ? 3.6 : 1;
@@ -156,7 +208,7 @@ export default function Analysis() {
       timeseries.absolute_time[0] &&
       timeseries.absolute_time[timeseries.absolute_time.length - 1]
     ) {
-      return `${formatAbsoluteClock(timeseries.absolute_time[0])} -> ${formatAbsoluteClock(timeseries.absolute_time[timeseries.absolute_time.length - 1])}`;
+      return `${formatAbsoluteClock(timeseries.absolute_time[0])} → ${formatAbsoluteClock(timeseries.absolute_time[timeseries.absolute_time.length - 1])}`;
     }
     return formatSecondsClock(end - start);
   };
@@ -183,19 +235,6 @@ export default function Analysis() {
     const first = Number(timeValues[0]);
     if (!Number.isFinite(first)) return timeValues.map((value) => Number(value));
     return timeValues.map((value) => Number(value) - first);
-  };
-  const getRelativePointTime = (name, rawTime) => {
-    const numericTime = Number(rawTime);
-    if (!Number.isFinite(numericTime)) return rawTime;
-    const item = results.find((entry) => entry.name === name);
-    const firstTime = Number(item?.profile?.timeseries?.time?.[0]);
-    if (!Number.isFinite(firstTime)) return numericTime;
-    return numericTime - firstTime;
-  };
-  const getPointDisplayTime = (point) => {
-    const rawTime = point?.rawTime ?? point?.time;
-    if (timeMode === "absolute") return rawTime;
-    return getRelativePointTime(point?.name, rawTime);
   };
 
   const combinedTimeseries = useMemo(() => {
@@ -266,58 +305,85 @@ export default function Analysis() {
     return rows;
   }, [visibleResults]);
 
-  const violinCharts = useMemo(() => {
+  const distributionCharts = useMemo(() => {
     const buildMetricChart = ({ key, title, unit }) => {
-      const sharedBand = title;
+      const allValues = visibleResults
+        .flatMap((item) => item.profile?.timeseries?.[key] || [])
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value));
+      const minValue = allValues.length ? Math.floor(Math.min(...allValues)) : 0;
+      const maxValue = allValues.length ? Math.ceil(Math.max(...allValues)) : 0;
+      const xBinStart = key === "acceleration" ? minValue : Math.min(0, minValue);
+      const xAxisRangeStart = key === "acceleration" ? 0 : Math.min(0, minValue);
+      const xAxisRangeEnd = Math.max(1, maxValue);
       const seriesItems = visibleResults
         .filter((item) => item.profile?.timeseries?.[key]?.length)
         .map((item) => {
-          const x = item.profile.timeseries[key].map((value) => Number(value));
+          const rawValues = item.profile?.timeseries?.[key] || [];
+          const binMap = new Map();
+
+          rawValues.forEach((rawValue, index) => {
+            const value = Number(rawValue);
+            if (!Number.isFinite(value)) return;
+
+            const clampedValue = Math.min(value, xAxisRangeEnd);
+            const binStart = xBinStart + Math.floor((clampedValue - xBinStart) / 1) * 1;
+            const safeBinStart = Number.isFinite(binStart) ? binStart : xBinStart;
+            const keyName = String(safeBinStart);
+            const current = binMap.get(keyName) || { count: 0 };
+            current.count += 1;
+            binMap.set(keyName, current);
+          });
+
+          const x = [];
+          const y = [];
+          const customdata = [];
+          for (let binStart = xBinStart; binStart < xAxisRangeEnd; binStart += 1) {
+            const entry = binMap.get(String(binStart)) || { count: 0 };
+            x.push(binStart + 0.5);
+            y.push(entry.count);
+            customdata.push([
+              binStart,
+              binStart + 1,
+            ]);
+          }
+
           const color = colorMap[item.name];
           return {
-            values: x,
             trace: {
-            key: item.name,
-            type: "violin",
-            name: item.name,
-            x,
-            y: new Array(x.length).fill(sharedBand),
-            orientation: "h",
-            side: "positive",
-            box: { visible: false },
-            meanline: { visible: false },
-            points: false,
-            hoveron: "kde",
-            spanmode: "soft",
-            scalemode: "width",
-            line: { color },
-            fillcolor: "rgba(0,0,0,0)",
-            opacity: 1,
-            showlegend: true,
+              key: item.name,
+              type: "bar",
+              name: item.name,
+              x,
+              y,
+              customdata,
+              width: 1,
+              marker: { color },
+              hovertemplate:
+                `${item.name}<br>${title}: %{customdata[0]:.0f} to %{customdata[1]:.0f} ${unit}` +
+                `<br>Count: %{y}<extra></extra>`,
+              showlegend: true,
             },
           };
-        });
+        })
+        .filter((item) => item.trace.x.length > 0);
 
       const traces = seriesItems.map((item) => item.trace);
       if (!traces.length) return null;
-      const maxValue = Math.max(
-        0,
-        ...seriesItems.flatMap((item) => item.values).filter((value) => Number.isFinite(value)),
-      );
       return {
         key,
         title,
         traces,
-        violinMode: "overlay",
+        barMode: "overlay",
         xAxis: {
           title: { text: unit },
           type: "linear",
-          range: [0, maxValue],
+          range: [xAxisRangeStart, xAxisRangeEnd],
         },
         yAxis: {
-          title: { text: "" },
-          type: "category",
-          showticklabels: false,
+          title: { text: "Count" },
+          type: distributionScale === "log" ? "log" : "linear",
+          rangemode: "tozero",
         },
       };
     };
@@ -326,7 +392,7 @@ export default function Analysis() {
       buildMetricChart({ key: "acceleration", title: "Acceleration Distribution", unit: "m/s²" }),
       buildMetricChart({ key: "speed", title: "Speed Distribution", unit: "m/s" }),
     ].filter(Boolean);
-  }, [visibleResults, colorMap]);
+  }, [visibleResults, colorMap, distributionScale]);
 
   const fmt = (v) =>
     v === undefined || v === null || Number.isNaN(v) ? "—" : Number(v).toFixed(3);
@@ -341,8 +407,8 @@ export default function Analysis() {
   };
   const allShown = results.length > 0 && results.every((r) => !hiddenMap[r.name]);
   const shownCount = results.filter((r) => !hiddenMap[r.name]).length;
-  const speedViolinChart = violinCharts.find((chart) => chart.key === "speed");
-  const accelerationViolinChart = violinCharts.find((chart) => chart.key === "acceleration");
+  const speedDistributionChart = distributionCharts.find((chart) => chart.key === "speed");
+  const accelerationDistributionChart = distributionCharts.find((chart) => chart.key === "acceleration");
   const onAspPointSelect = (point) => {
     const idx = Number(point?.index);
     const t = Number(point?.time);
@@ -423,10 +489,10 @@ export default function Analysis() {
               setMarkedPointMap={setMarkedPointMap}
               pointKey={pointKey}
               selectedVisibleCount={selectedVisibleCount}
-              pointWindow={pointWindow}
-              setPointWindow={setPointWindow}
-              timeWindowSec={timeWindowSec}
-              setTimeWindowSec={setTimeWindowSec}
+              pointsBefore={pointsBefore}
+              setPointsBefore={setPointsBefore}
+              pointsAfter={pointsAfter}
+              setPointsAfter={setPointsAfter}
               setSelectedPoints={setSelectedPoints}
               filteredSelectedPoints={filteredSelectedPoints}
               toggleSortRule={toggleSortRule}
@@ -451,16 +517,16 @@ export default function Analysis() {
         onAspPointSelect={onAspPointSelect}
         onAspPointsSelect={onAspPointsSelect}
         visibleSelectedPoints={visibleSelectedPoints}
-        pointWindow={pointWindow}
+        pointsBefore={pointsBefore}
+        pointsAfter={pointsAfter}
         combinedStatsRows={combinedStatsRows}
         metricUnits={metricUnits}
         fmtWithUnit={fmtWithUnit}
         combinedTimeseries={combinedTimeseries}
         xAxisTitle={xAxisTitle}
-        timeWindowSec={timeWindowSec}
         speedReferenceLines={speedReferenceLines}
-        speedViolinChart={speedViolinChart}
-        accelerationViolinChart={accelerationViolinChart}
+        speedDistributionChart={speedDistributionChart}
+        accelerationDistributionChart={accelerationDistributionChart}
         fmt={fmt}
         formatSpeedPair={formatSpeedPair}
         formatDistanceKm={formatDistanceKm}
@@ -473,6 +539,10 @@ export default function Analysis() {
         setSpeedSeriesUnit={setSpeedSeriesUnit}
         timeMode={timeMode}
         setTimeMode={setTimeMode}
+        distributionScale={distributionScale}
+        setDistributionScale={setDistributionScale}
+        preprocessing={preprocessing}
+        analysisParams={analysisParams}
       />
     </section>
   );

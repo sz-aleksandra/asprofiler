@@ -143,8 +143,8 @@ export default function TrajectoryChart({
   profiles,
   colorMap,
   selectedPoints,
-  pointWindow = 10,
-  timeWindowSec = 10,
+  pointsBefore = 10,
+  pointsAfter = 10,
 }) {
   const containerRef = useRef(null);
   const cssBlack = getCssVar("--black");
@@ -206,7 +206,6 @@ export default function TrajectoryChart({
       const baseColor = colorMap?.[fileName] || "#1f77b4";
       const byIndex = [...series].sort((a, b) => a.index - b.index);
       const pointDots = [];
-      const timeSegment = [];
       const centerPoints = [];
 
       selectedForFile.forEach((selectedPoint) => {
@@ -214,23 +213,13 @@ export default function TrajectoryChart({
         if (!center) return;
         centerPoints.push(center);
 
-        const indexFrom = selectedPoint.index - pointWindow;
-        const indexTo = selectedPoint.index + pointWindow;
+        const indexFrom = selectedPoint.index - pointsBefore;
+        const indexTo = selectedPoint.index + pointsAfter;
         byIndex.forEach((point) => {
           if (point.index >= indexFrom && point.index <= indexTo) {
             pointDots.push(point);
           }
         });
-
-        if (Number.isFinite(selectedPoint.rawTime)) {
-          const timeFrom = selectedPoint.rawTime - timeWindowSec;
-          const timeTo = selectedPoint.rawTime + timeWindowSec;
-          byIndex.forEach((point) => {
-            if (point.time >= timeFrom && point.time <= timeTo) {
-              timeSegment.push(point);
-            }
-          });
-        }
       });
 
       const uniqueByIndex = (points) =>
@@ -238,24 +227,8 @@ export default function TrajectoryChart({
           (a, b) => a.index - b.index,
         );
 
-      const segmentPoints = uniqueByIndex(timeSegment);
       const dotPoints = uniqueByIndex(pointDots);
       const centers = uniqueByIndex(centerPoints);
-
-      if (segmentPoints.length > 1) {
-        traces.push({
-          type: "scatter",
-          mode: "lines",
-          x: segmentPoints.map((point) => point.x + X_OFFSET),
-          y: segmentPoints.map((point) => point.y),
-          customdata: segmentPoints.map((point) => [point.time, point.speed, point.accel]),
-          line: { color: baseColor, width: 4 },
-          name: `${fileName} selected window`,
-          hovertemplate:
-            `${fileName}<br>Time: %{customdata[0]:.1f} s<br>X: %{x:.2f} m<br>Y: %{y:.2f} m<br>Speed: %{customdata[1]:.3f} m/s<br>Acceleration: %{customdata[2]:.3f} m/s²<extra></extra>`,
-          showlegend: false,
-        });
-      }
 
       if (dotPoints.length) {
         traces.push({
@@ -345,7 +318,7 @@ export default function TrajectoryChart({
     return () => {
       ro.disconnect();
     };
-  }, [cssBlack, colorMap, data, pointWindow, selectedPoints, timeWindowSec]);
+  }, [cssBlack, colorMap, data, pointsBefore, pointsAfter, selectedPoints]);
 
   if (!data.length) return null;
 

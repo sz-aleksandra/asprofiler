@@ -80,7 +80,7 @@
 .toolsDrawerOpen .selectionInput,
 .toolsDrawerOpen .selectionSelect {
   border-color: var(--white);
-  background: var(--white);
+  background: white;
   color: var(--black);
 }
 
@@ -106,6 +106,23 @@
   color: var(--white);
 }
 
+.parameterSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  font-weight: 600;
+  color: var(--black);
+}
+
+.parameterSectionTitle {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--black);
+  margin-bottom: 8px;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -113,6 +130,11 @@
   padding: 12px 14px;
   border-bottom: 1px solid var(--black);
   background: transparent;
+}
+
+.toolbarNoBorder {
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .toolbarLeft {
@@ -435,6 +457,7 @@
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  text-align: left;
 }
 
 .selectionLabel {
@@ -447,10 +470,14 @@
 }
 
 .selectionInput {
-  width: 80px;
+  min-width: 72px;
+  width: 72px;
   padding: 6px 8px;
   border: 1px solid var(--black);
   border-radius: 6px;
+  align-self: center;
+  background: white;
+  color: var(--black);
 }
 
 .selectionSelect {
@@ -458,6 +485,14 @@
   padding: 6px 8px;
   border: 1px solid var(--black);
   border-radius: 6px;
+  align-self: center;
+  background: white;
+  color: var(--black);
+}
+
+.selectionInput:disabled,
+.selectionSelect:disabled {
+  opacity: 0.5;
 }
 
 .selectionCellCheckbox {

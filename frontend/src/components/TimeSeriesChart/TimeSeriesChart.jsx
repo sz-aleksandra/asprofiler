@@ -15,8 +15,8 @@ export default function TimeSeriesChart({
   xTickFormatter,
   xHoverFormatter,
   selectedPoints,
-  pointWindow,
-  timeWindowSec,
+  pointsBefore = 10,
+  pointsAfter = 10,
   yReferenceLines = [],
 }) {
   const containerRef = useRef(null);
@@ -121,21 +121,7 @@ export default function TimeSeriesChart({
         }
         const centerTime = Number(xData[selectedIndex]);
         if (Number.isFinite(centerTime)) {
-          const windowFrom = centerTime - timeWindowSec;
-          const windowTo = centerTime + timeWindowSec;
           shapes.push(
-            {
-              type: "rect",
-              xref: "x",
-              yref: "paper",
-              x0: windowFrom,
-              x1: windowTo,
-              y0: 0,
-              y1: 1,
-              fillcolor: hexToRgba(cssBlack, 0.05),
-              line: { width: 0 },
-              layer: "below",
-            },
             {
               type: "line",
               xref: "x",
@@ -144,13 +130,17 @@ export default function TimeSeriesChart({
               x1: centerTime,
               y0: 0,
               y1: 1,
-              line: { color: hexToRgba(cssBlack, 0.5), width: 2 },
+              line: {
+                color: target?.color || hexToRgba(cssBlack, 0.75),
+                width: 2,
+                dash: "dot",
+              },
             },
           );
         }
 
-        const pFrom = Math.max(0, selectedIndex - pointWindow);
-        const pTo = Math.min(xData.length - 1, selectedIndex + pointWindow);
+        const pFrom = Math.max(0, selectedIndex - pointsBefore);
+        const pTo = Math.min(xData.length - 1, selectedIndex + pointsAfter);
         const xWindow = xData.slice(pFrom, pTo + 1);
         const yWindow = yData.slice(pFrom, pTo + 1);
         if (xWindow.length > 1) {
@@ -228,7 +218,7 @@ export default function TimeSeriesChart({
       referenceX: referenceSeries?.x || time || [],
       referenceLabels: referenceSeries?.labels || [],
     };
-  }, [time, series, selectedPoints, pointWindow, timeWindowSec, cssBlack, yReferenceLines, xTickFormatter, xHoverFormatter]);
+  }, [time, series, selectedPoints, pointsBefore, pointsAfter, cssBlack, yReferenceLines, xTickFormatter, xHoverFormatter]);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;

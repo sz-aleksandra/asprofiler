@@ -14,7 +14,13 @@ import styles from "./FilesList.module.css";
 const DEFAULT_PARAMS = {
   min_speed: 3,
   bin_size: 0.2,
+  top_n: 2,
   confidence_level: 0.95,
+};
+const DEFAULT_PREPROCESSING = {
+  filter_window: 5,
+  filter_mode: "median_mean",
+  hacc_threshold: 2,
 };
 
 export default function FilesList() {
@@ -53,6 +59,15 @@ export default function FilesList() {
     } catch {
       return {};
     }
+  });
+  const [preprocessing, setPreprocessing] = useState(() => {
+    try {
+      const raw = localStorage.getItem("analysis_preprocessing");
+      if (raw) return { ...DEFAULT_PREPROCESSING, ...JSON.parse(raw) };
+    } catch {
+      // ignore
+    }
+    return DEFAULT_PREPROCESSING;
   });
 
   const closeToast = () => setToast({ message: "", type: "info" });
@@ -101,6 +116,7 @@ export default function FilesList() {
     localStorage.setItem("analysis_params_map", JSON.stringify(paramsMap));
     localStorage.setItem("analysis_colors_map", JSON.stringify(colorsMap));
     localStorage.setItem("analysis_default_color", defaultColor);
+    localStorage.setItem("analysis_preprocessing", JSON.stringify(preprocessing));
   };
 
   const updateGlobalParam = (key, value) => {
@@ -124,7 +140,11 @@ export default function FilesList() {
       const processed = await Promise.all(
         filesToAnalyze.map(async (file) => {
           try {
-            const normalized = await normalizeGpsCsvFile(file);
+            const normalized = await normalizeGpsCsvFile(file, {
+              filterWindow: preprocessing.filter_window,
+              filterMode: preprocessing.filter_mode,
+              haccThreshold: preprocessing.hacc_threshold,
+            });
             return { name: file.name, file: normalized };
           } catch (error) {
             return { name: file.name, error: String(error.message || error) };
@@ -158,6 +178,7 @@ export default function FilesList() {
             color_map: Object.fromEntries(
               okResults.map((item) => [item.name, colorsMap[item.name] || defaultColor]),
             ),
+            preprocessing,
           },
         });
       }
@@ -192,12 +213,82 @@ export default function FilesList() {
       <Dropzone onFiles={onFiles} />
 
       <div className={styles.controls}>
-        <div className={styles.sectionTitle}>Analysis preset</div>
-        <div className={styles.controlRow}>
-          <label className={styles.controlLabel}>
+        <div className={`${styles.sectionTitle} ${styles.parameterSectionTitle}`}>Filtering parameters</div>
+        <div className={styles.selectionControls}>
+          <label className={styles.selectionLabel}>
+            Filter type
+            <select
+              className={styles.selectionSelect}
+              value={preprocessing.filter_mode}
+              onChange={(e) => {
+                const next = { ...preprocessing, filter_mode: e.target.value };
+                setPreprocessing(next);
+                localStorage.setItem("analysis_preprocessing", JSON.stringify(next));
+              }}
+              disabled={busy}
+            >
+              <option value="none">None</option>
+              <option value="median">Median</option>
+              <option value="mean">Mean</option>
+              <option value="median_mean">Median → Mean</option>
+            </select>
+          </label>
+          <label className={styles.selectionLabel}>
+            Filter window
+            <input
+              className={styles.selectionInput}
+              type="number"
+              min="1"
+              step="1"
+              value={preprocessing.filter_window}
+              onChange={(e) => {
+                const next = {
+                  ...preprocessing,
+                  filter_window: Math.max(1, Math.floor(Number(e.target.value) || 1)),
+                };
+                setPreprocessing(next);
+                localStorage.setItem("analysis_preprocessing", JSON.stringify(next));
+              }}
+              disabled={busy || preprocessing.filter_mode === "none"}
+            />
+          </label>
+          <label className={styles.selectionLabel}>
+            <span className={styles.statsHeadWithHelp}>
+              <span>Hacc threshold (m)</span>
+              <span className={styles.helpIcon} tabIndex={0}>
+                ?
+                <span className={styles.helpTooltip}>
+                  <span>Horizontal accuracy = estimated horizontal position error in meters.</span>
+                </span>
+              </span>
+            </span>
+            <input
+              className={styles.selectionInput}
+              type="number"
+              min="0"
+              step="0.1"
+              value={preprocessing.hacc_threshold}
+              onChange={(e) => {
+                const next = {
+                  ...preprocessing,
+                  hacc_threshold: Math.max(0, Number(e.target.value) || 0),
+                };
+                setPreprocessing(next);
+                localStorage.setItem("analysis_preprocessing", JSON.stringify(next));
+              }}
+              disabled={busy}
+            />
+          </label>
+        </div>
+      </div>
+
+      <div className={styles.controls}>
+        <div className={`${styles.sectionTitle} ${styles.parameterSectionTitle}`}>Analysis preset</div>
+        <div className={styles.selectionControls}>
+          <label className={styles.selectionLabel}>
             Min speed (m/s)
             <input
-              className={styles.controlInput}
+              className={styles.selectionInput}
               type="number"
               step="0.1"
               value={params.min_speed}
@@ -205,10 +296,10 @@ export default function FilesList() {
               disabled={busy}
             />
           </label>
-          <label className={styles.controlLabel}>
+          <label className={styles.selectionLabel}>
             Bin size (m/s)
             <input
-              className={styles.controlInput}
+              className={styles.selectionInput}
               type="number"
               step="0.1"
               value={params.bin_size}
@@ -216,10 +307,22 @@ export default function FilesList() {
               disabled={busy}
             />
           </label>
-          <label className={styles.controlLabel}>
+          <label className={styles.selectionLabel}>
+            Top points per bin
+            <input
+              className={styles.selectionInput}
+              type="number"
+              min="1"
+              step="1"
+              value={params.top_n}
+              onChange={(e) => updateGlobalParam("top_n", Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+              disabled={busy}
+            />
+          </label>
+          <label className={styles.selectionLabel}>
             Confidence level
             <input
-              className={styles.controlInput}
+              className={styles.selectionInput}
               type="number"
               step="0.01"
               min="0.01"
@@ -229,7 +332,7 @@ export default function FilesList() {
               disabled={busy}
             />
           </label>
-          <label className={styles.controlLabel}>
+          <label className={styles.selectionLabel}>
             Default color
             <input
               className={styles.colorInput}
@@ -258,7 +361,7 @@ export default function FilesList() {
               <span>Select all</span>
             </label>
             <span className={styles.count}>
-              {pendingFiles.length} files ready for analysis · {selected.size} selected
+              {pendingFiles.length} files · {selected.size} selected
             </span>
           </div>
           <div className={styles.actionsGroup}>
@@ -323,7 +426,7 @@ export default function FilesList() {
               </div>
               {checked && (
                 <div className={styles.inlinePanel}>
-                  <label className={styles.controlLabel}>
+                  <label className={styles.selectionLabel}>
                     Color
                     <input
                       className={styles.colorInput}
@@ -337,10 +440,10 @@ export default function FilesList() {
                       disabled={busy}
                     />
                   </label>
-                  <label className={styles.controlLabel}>
+                  <label className={styles.selectionLabel}>
                     Min speed (m/s)
                     <input
-                      className={styles.controlInput}
+                      className={styles.selectionInput}
                       type="number"
                       step="0.1"
                       value={perParams.min_speed}
@@ -355,10 +458,10 @@ export default function FilesList() {
                       disabled={busy}
                     />
                   </label>
-                  <label className={styles.controlLabel}>
+                  <label className={styles.selectionLabel}>
                     Bin size (m/s)
                     <input
-                      className={styles.controlInput}
+                      className={styles.selectionInput}
                       type="number"
                       step="0.1"
                       value={perParams.bin_size}
@@ -373,10 +476,32 @@ export default function FilesList() {
                       disabled={busy}
                     />
                   </label>
-                  <label className={styles.controlLabel}>
+                  <label className={styles.selectionLabel}>
+                    Top points per bin
+                    <input
+                      className={styles.selectionInput}
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={perParams.top_n}
+                      onChange={(e) => {
+                        const next = {
+                          ...paramsMap,
+                          [file.name]: {
+                            ...perParams,
+                            top_n: Math.max(1, Math.floor(Number(e.target.value) || 1)),
+                          },
+                        };
+                        setParamsMap(next);
+                        localStorage.setItem("analysis_params_map", JSON.stringify(next));
+                      }}
+                      disabled={busy}
+                    />
+                  </label>
+                  <label className={styles.selectionLabel}>
                     Confidence level
                     <input
-                      className={styles.controlInput}
+                      className={styles.selectionInput}
                       type="number"
                       step="0.01"
                       min="0.01"

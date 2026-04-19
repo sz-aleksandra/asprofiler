@@ -10,6 +10,7 @@ export default function DistributionChart({
   traces,
   showLegend = true,
   violinMode = false,
+  barMode,
   xAxis,
   yAxis,
 }) {
@@ -31,6 +32,21 @@ export default function DistributionChart({
             ...(trace.line || {}),
           },
           fillcolor: trace.fillcolor || "rgba(0,0,0,0)",
+        };
+      }
+      if (trace.type === "histogram" || trace.type === "bar") {
+        const baseColor = trace.marker?.color || trace.line?.color;
+        return {
+          ...trace,
+          opacity: trace.opacity ?? 0.3,
+          marker: {
+            color: trace.marker?.color || baseColor,
+            line: {
+              width: 2,
+              color: baseColor,
+            },
+            ...(trace.marker || {}),
+          },
         };
       }
       return trace;
@@ -68,6 +84,7 @@ export default function DistributionChart({
       showlegend: showLegend,
       violinmode:
         violinMode === true ? "group" : typeof violinMode === "string" ? violinMode : undefined,
+      barmode: barMode,
       xaxis: xAxis,
       yaxis: yAxis,
       legend: {
@@ -88,7 +105,7 @@ export default function DistributionChart({
     const ro = new ResizeObserver(() => Plotly.Plots.resize(node));
     ro.observe(node);
     return () => ro.disconnect();
-  }, [plotData, title, cssBlack, cssRed, showLegend, violinMode, xAxis, yAxis]);
+  }, [plotData, title, cssBlack, cssRed, showLegend, violinMode, barMode, xAxis, yAxis]);
 
   if (!plotData) return null;
 

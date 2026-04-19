@@ -15,7 +15,8 @@ export default function AspChart({
   onPointSelect,
   onPointsSelect,
   selectedPoints,
-  pointWindow,
+  pointsBefore = 10,
+  pointsAfter = 10,
 }) {
   const containerRef = useRef(null);
   const cssBlack = getCssVar("--black");
@@ -176,11 +177,11 @@ export default function AspChart({
         if (selectedForFile.length > 0 && all.length > 0) {
           const byIndex = [...all].sort((a, b) => a.index - b.index);
           const selectedIndexSet = new Set(selectedForFile.map((p) => Number(p.index)));
-          const centers = [];
+        const centers = [];
         selectedForFile.forEach((sel) => {
           const selectedIndex = Number(sel.index);
-          const rangeFrom = selectedIndex - pointWindow;
-          const rangeTo = selectedIndex + pointWindow;
+          const rangeFrom = selectedIndex - pointsBefore;
+          const rangeTo = selectedIndex + pointsAfter;
           const windowPoints = byIndex.filter((p) => p.index >= rangeFrom && p.index <= rangeTo);
           if (windowPoints.length > 1) {
             const markerSizes = windowPoints.map((p) => (selectedIndexSet.has(p.index) ? 0 : 4));
@@ -232,7 +233,7 @@ export default function AspChart({
       maxSpeed: Number.isFinite(globalMaxSpeed) ? formatSpeed(globalMaxSpeed) : 0,
       maxAccel: Number.isFinite(globalMaxAccel) ? globalMaxAccel : 0,
     };
-  }, [profiles, colorMap, hiddenMap, selectedPoints, pointWindow, formatSpeed]);
+  }, [profiles, colorMap, hiddenMap, selectedPoints, pointsBefore, pointsAfter, formatSpeed]);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;

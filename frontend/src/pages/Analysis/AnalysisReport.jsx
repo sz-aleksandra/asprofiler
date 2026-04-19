@@ -19,16 +19,16 @@ function AnalysisReport({
   onAspPointSelect,
   onAspPointsSelect,
   visibleSelectedPoints,
-  pointWindow,
+  pointsBefore,
+  pointsAfter,
   combinedStatsRows,
   metricUnits,
   fmtWithUnit,
   combinedTimeseries,
   xAxisTitle,
-  timeWindowSec,
   speedReferenceLines,
-  speedViolinChart,
-  accelerationViolinChart,
+  speedDistributionChart,
+  accelerationDistributionChart,
   fmt,
   formatSpeedPair,
   formatDistanceKm,
@@ -41,9 +41,96 @@ function AnalysisReport({
   setSpeedSeriesUnit,
   timeMode,
   setTimeMode,
+  distributionScale,
+  setDistributionScale,
+  preprocessing,
+  analysisParams,
 }) {
   return (
     <>
+      <div className={`${styles.timeseriesGrid} ${styles.timeseriesGridCompact}`}>
+        <div className={styles.parameterSection}>
+          <div className={`${styles.sectionTitle} ${styles.parameterSectionTitle}`}>Filtering parameters</div>
+          <div className={styles.selectionControls}>
+            <label className={styles.selectionLabel}>
+              Filter type
+              <select className={styles.selectionSelect} value={preprocessing.filter_mode} disabled>
+                <option value="none">None</option>
+                <option value="median">Median</option>
+                <option value="mean">Mean</option>
+                  <option value="median_mean">Median → Mean</option>
+              </select>
+            </label>
+            <label className={styles.selectionLabel}>
+              Filter window
+              <input
+                className={styles.selectionInput}
+                type="number"
+                value={preprocessing.filter_window}
+                disabled
+              />
+            </label>
+            <label className={styles.selectionLabel}>
+              <span className={styles.statsHeadWithHelp}>
+                <span>Hacc threshold (m)</span>
+                <span className={styles.helpIcon} tabIndex={0}>
+                  ?
+                  <span className={styles.helpTooltip}>
+                    <span>Horizontal accuracy = estimated horizontal position error in meters.</span>
+                  </span>
+                </span>
+              </span>
+              <input
+                className={styles.selectionInput}
+                type="number"
+                value={preprocessing.hacc_threshold}
+                disabled
+              />
+            </label>
+          </div>
+        </div>
+        <div className={styles.parameterSection}>
+          <div className={`${styles.sectionTitle} ${styles.parameterSectionTitle}`}>Analysis preset</div>
+          <div className={styles.selectionControls}>
+            <label className={styles.selectionLabel}>
+              Min speed (m/s)
+              <input
+                className={styles.selectionInput}
+                type="number"
+                value={analysisParams.min_speed}
+                disabled
+              />
+            </label>
+            <label className={styles.selectionLabel}>
+              Bin size (m/s)
+              <input
+                className={styles.selectionInput}
+                type="number"
+                value={analysisParams.bin_size}
+                disabled
+              />
+            </label>
+            <label className={styles.selectionLabel}>
+              Top points per bin
+              <input
+                className={styles.selectionInput}
+                type="number"
+                value={analysisParams.top_n}
+                disabled
+              />
+            </label>
+            <label className={styles.selectionLabel}>
+              Confidence level
+              <input
+                className={styles.selectionInput}
+                type="number"
+                value={analysisParams.confidence_level}
+                disabled
+              />
+            </label>
+          </div>
+        </div>
+      </div>
       <div className={styles.reportTable}>
         <div className={styles.toolbar}>
           <div className={styles.toolbarLeft}>
@@ -130,14 +217,15 @@ function AnalysisReport({
         <div className={styles.empty}>All series hidden. Use “Show”.</div>
       ) : (
         <>
-      <AspChart
-        profiles={visibleResults}
-        colorMap={colorMap}
-        onPointSelect={onAspPointSelect}
-        onPointsSelect={onAspPointsSelect}
-        selectedPoints={visibleSelectedPoints}
-        pointWindow={pointWindow}
-      />
+        <AspChart
+          profiles={visibleResults}
+          colorMap={colorMap}
+          onPointSelect={onAspPointSelect}
+          onPointsSelect={onAspPointsSelect}
+          selectedPoints={visibleSelectedPoints}
+          pointsBefore={pointsBefore}
+          pointsAfter={pointsAfter}
+        />
 
       <section className={styles.fileSection}>
         <div className={styles.statsCard}>
@@ -191,7 +279,7 @@ function AnalysisReport({
         </div>
 
         <div className={`${styles.timeseriesGrid} ${styles.timeseriesGridCompact}`}>
-          <div className={styles.toolbar}>
+          <div className={`${styles.toolbar} ${styles.toolbarNoBorder}`}>
             <div className={styles.selectionControls}>
               <label className={styles.selectionLabel}>
                 Speed chart unit
@@ -226,8 +314,8 @@ function AnalysisReport({
             xTickFormatter={xTickFormatter}
             xHoverFormatter={xHoverFormatter}
             selectedPoints={visibleSelectedPoints}
-            pointWindow={pointWindow}
-            timeWindowSec={timeWindowSec}
+            pointsBefore={pointsBefore}
+            pointsAfter={pointsAfter}
             yReferenceLines={speedReferenceLines}
           />
         </div>
@@ -241,30 +329,45 @@ function AnalysisReport({
             xTickFormatter={xTickFormatter}
             xHoverFormatter={xHoverFormatter}
             selectedPoints={visibleSelectedPoints}
-            pointWindow={pointWindow}
-            timeWindowSec={timeWindowSec}
+            pointsBefore={pointsBefore}
+            pointsAfter={pointsAfter}
           />
         </div>
 
-        <div className={styles.timeseriesGrid}>
-          {speedViolinChart && (
+        <div className={`${styles.timeseriesGrid} ${styles.timeseriesGridCompact}`}>
+          <div className={`${styles.toolbar} ${styles.toolbarNoBorder}`}>
+            <div className={styles.selectionControls}>
+              <label className={styles.selectionLabel}>
+                Distribution scale
+                <select
+                  className={styles.selectionSelect}
+                  value={distributionScale}
+                  onChange={(e) => setDistributionScale(e.target.value)}
+                >
+                  <option value="linear">Linear</option>
+                    <option value="log">Log</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          {speedDistributionChart && (
             <DistributionChart
-              key={speedViolinChart.key}
-              title={speedViolinChart.title}
-              traces={speedViolinChart.traces}
-              violinMode={speedViolinChart.violinMode}
-              xAxis={speedViolinChart.xAxis}
-              yAxis={speedViolinChart.yAxis}
+              key={speedDistributionChart.key}
+              title={speedDistributionChart.title}
+              traces={speedDistributionChart.traces}
+              barMode={speedDistributionChart.barMode}
+              xAxis={speedDistributionChart.xAxis}
+              yAxis={speedDistributionChart.yAxis}
             />
           )}
-          {accelerationViolinChart && (
+          {accelerationDistributionChart && (
             <DistributionChart
-              key={accelerationViolinChart.key}
-              title={accelerationViolinChart.title}
-              traces={accelerationViolinChart.traces}
-              violinMode={accelerationViolinChart.violinMode}
-              xAxis={accelerationViolinChart.xAxis}
-              yAxis={accelerationViolinChart.yAxis}
+              key={accelerationDistributionChart.key}
+              title={accelerationDistributionChart.title}
+              traces={accelerationDistributionChart.traces}
+              barMode={accelerationDistributionChart.barMode}
+              xAxis={accelerationDistributionChart.xAxis}
+              yAxis={accelerationDistributionChart.yAxis}
             />
           )}
         </div>
@@ -279,8 +382,8 @@ function AnalysisReport({
               profiles={visibleResults}
               colorMap={colorMap}
               selectedPoints={visibleSelectedPoints}
-              pointWindow={pointWindow}
-              timeWindowSec={timeWindowSec}
+              pointsBefore={pointsBefore}
+              pointsAfter={pointsAfter}
             />
           </div>
         )}
