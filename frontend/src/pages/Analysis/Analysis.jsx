@@ -3,7 +3,6 @@ import { useLocation } from "react-router-dom";
 
 import { useAnalysisLayout } from "../../components/Layout/AnalysisLayoutContext";
 import { getCssVar } from "../../utils/getCssVar";
-import { hexToRgba } from "../../utils/hexToRgba";
 import AnalysisReport from "./AnalysisReport";
 import AnalysisToolbar from "./AnalysisToolbar";
 
@@ -16,13 +15,10 @@ export default function Analysis() {
   useEffect(() => () => setToolsOpen(false), [setToolsOpen]);
 
   const analysisState = location.state || {};
-  const results = useMemo(
-    () => (Array.isArray(analysisState?.results) ? analysisState.results : []),
-    [analysisState],
-  );
+  const results = Array.isArray(analysisState?.results) ? analysisState.results : [];
 
   const [colors, setColors] = useState({});
-  const savedColors = useMemo(() => analysisState?.color_map || {}, [analysisState]);
+  const savedColors = analysisState?.color_map || {};
   const defaultColor = getCssVar("--red");
   const colorMap = useMemo(
     () =>
@@ -43,7 +39,9 @@ export default function Analysis() {
   const [speedSeriesUnit, setSpeedSeriesUnit] = useState(
     () => localStorage.getItem("analysis_speed_series_unit") || "m/s",
   );
-  const [timeMode, setTimeMode] = useState(() => localStorage.getItem("analysis_time_mode") || "relative");
+  const [timeMode, setTimeMode] = useState(
+    () => localStorage.getItem("analysis_time_mode") || "relative",
+  );
   const [distributionScale, setDistributionScale] = useState(
     () => localStorage.getItem("analysis_distribution_scale") || "linear",
   );
@@ -99,7 +97,7 @@ export default function Analysis() {
   const selectedVisibleCount = visibleSelectedPoints.filter(
     (p) => markedPointMap[pointKey(p)],
   ).length;
-  const filteredSelectedPoints = useMemo(() => {
+  const filteredSelectedPoints = (() => {
     const sorted = [...visibleSelectedPoints];
     if (!pointsSortRules.length) return sorted;
 
@@ -107,7 +105,8 @@ export default function Analysis() {
       for (const rule of pointsSortRules) {
         let cmp = 0;
         if (rule.key === "name") cmp = String(a.name).localeCompare(String(b.name));
-        if (rule.key === "time") cmp = Number(getPointDisplayTime(a)) - Number(getPointDisplayTime(b));
+        if (rule.key === "time")
+          cmp = Number(getPointDisplayTime(a)) - Number(getPointDisplayTime(b));
         if (rule.key === "speed") cmp = Number(a.speed) - Number(b.speed);
         if (rule.key === "accel") cmp = Number(a.accel) - Number(b.accel);
         if (cmp !== 0) return rule.dir === "asc" ? cmp : -cmp;
@@ -115,7 +114,7 @@ export default function Analysis() {
       return 0;
     });
     return sorted;
-  }, [visibleSelectedPoints, pointsSortRules, timeMode, results]);
+  })();
 
   const toggleSortRule = (key) => {
     setPointsSortRules((prev) => {
@@ -213,7 +212,8 @@ export default function Analysis() {
     return formatSecondsClock(end - start);
   };
   const formatPointTime = (point) => {
-    if (timeMode === "absolute" && point?.absoluteTime) return formatAbsoluteClock(point.absoluteTime);
+    if (timeMode === "absolute" && point?.absoluteTime)
+      return formatAbsoluteClock(point.absoluteTime);
     return formatSecondsClock(getPointDisplayTime(point));
   };
   const formatTrajectoryTime = (seconds, absoluteTime) => {
@@ -232,9 +232,7 @@ export default function Analysis() {
   const formatTimeAxisTick = (value, label) =>
     canUseAbsoluteTimeAxis && label ? formatAbsoluteClock(label, 1) : formatSecondsClock(value, 1);
   const formatTimeHoverLabel = (value, label) =>
-    canUseAbsoluteTimeAxis && label
-      ? formatAbsoluteClock(label, 1)
-      : formatSecondsClock(value, 1);
+    canUseAbsoluteTimeAxis && label ? formatAbsoluteClock(label, 1) : formatSecondsClock(value, 1);
 
   const getRelativeTimeAxis = (timeValues) => {
     if (!Array.isArray(timeValues) || !timeValues.length) return [];
@@ -243,7 +241,7 @@ export default function Analysis() {
     return timeValues.map((value) => Number(value) - first);
   };
 
-  const combinedTimeseries = useMemo(() => {
+  const combinedTimeseries = (() => {
     const speedSeries = [];
     const accelerationSeries = [];
 
@@ -273,22 +271,18 @@ export default function Analysis() {
     });
 
     return { speedSeries, accelerationSeries };
-  }, [visibleResults, colorMap, speedSeriesFactor, timeMode]);
+  })();
   const xAxisTitle = canUseAbsoluteTimeAxis ? "Absolute time" : "Time from start";
-  const speedReferenceLines = useMemo(
-    () =>
-      visibleResults
-        .map((item) => ({
-          y: Number(item?.profile?.meta?.min_speed) * speedSeriesFactor,
-          color: colorMap[item.name],
-          width: 1.5,
-          dash: "dash",
-        }))
-        .filter((line) => Number.isFinite(line.y)),
-    [visibleResults, colorMap, speedSeriesFactor],
-  );
+  const speedReferenceLines = visibleResults
+    .map((item) => ({
+      y: Number(item?.profile?.meta?.min_speed) * speedSeriesFactor,
+      color: colorMap[item.name],
+      width: 1.5,
+      dash: "dash",
+    }))
+    .filter((line) => Number.isFinite(line.y));
 
-  const combinedStatsRows = useMemo(() => {
+  const combinedStatsRows = (() => {
     const rows = [];
     visibleResults.forEach((item) => {
       const stats = item.profile?.stats || {};
@@ -309,9 +303,9 @@ export default function Analysis() {
       });
     });
     return rows;
-  }, [visibleResults]);
+  })();
 
-  const distributionCharts = useMemo(() => {
+  const distributionCharts = (() => {
     const buildMetricChart = ({ key, title, unit }) => {
       const allValues = visibleResults
         .flatMap((item) => item.profile?.timeseries?.[key] || [])
@@ -328,7 +322,7 @@ export default function Analysis() {
           const rawValues = item.profile?.timeseries?.[key] || [];
           const binMap = new Map();
 
-          rawValues.forEach((rawValue, index) => {
+          rawValues.forEach((rawValue) => {
             const value = Number(rawValue);
             if (!Number.isFinite(value)) return;
 
@@ -348,10 +342,7 @@ export default function Analysis() {
             const entry = binMap.get(String(binStart)) || { count: 0 };
             x.push(binStart + 0.5);
             y.push(entry.count);
-            customdata.push([
-              binStart,
-              binStart + 1,
-            ]);
+            customdata.push([binStart, binStart + 1]);
           }
 
           const color = colorMap[item.name];
@@ -398,7 +389,7 @@ export default function Analysis() {
       buildMetricChart({ key: "acceleration", title: "Acceleration Distribution", unit: "m/s²" }),
       buildMetricChart({ key: "speed", title: "Speed Distribution", unit: "m/s" }),
     ].filter(Boolean);
-  }, [visibleResults, colorMap, distributionScale]);
+  })();
 
   const fmt = (v) =>
     v === undefined || v === null || Number.isNaN(v) ? "—" : Number(v).toFixed(3);
@@ -414,7 +405,9 @@ export default function Analysis() {
   const allShown = results.length > 0 && results.every((r) => !hiddenMap[r.name]);
   const shownCount = results.filter((r) => !hiddenMap[r.name]).length;
   const speedDistributionChart = distributionCharts.find((chart) => chart.key === "speed");
-  const accelerationDistributionChart = distributionCharts.find((chart) => chart.key === "acceleration");
+  const accelerationDistributionChart = distributionCharts.find(
+    (chart) => chart.key === "acceleration",
+  );
   const onAspPointSelect = (point) => {
     const idx = Number(point?.index);
     const t = Number(point?.time);

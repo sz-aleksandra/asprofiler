@@ -117,7 +117,7 @@ export default function AnalysisToolbar({
                 Filename{sortBadge("name") || " ↕"}
               </button>
               <button className={styles.selectionSortBtn} type="button" onClick={() => toggleSortRule("time")}>
-                Time{timeMode === "absolute" ? " abs." : ""}{sortBadge("time") || " ↕"}
+                Time{sortBadge("time") || " ↕"}
               </button>
               <button className={styles.selectionSortBtn} type="button" onClick={() => toggleSortRule("speed")}>
                 Speed{sortBadge("speed") || " ↕"}
