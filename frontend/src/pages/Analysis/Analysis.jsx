@@ -14,21 +14,25 @@ export default function Analysis() {
 
   useEffect(() => () => setToolsOpen(false), [setToolsOpen]);
 
-  const analysisState = location.state || {};
+  const analysisState = location.state;
   const results = Array.isArray(analysisState?.results) ? analysisState.results : [];
 
   const [colors, setColors] = useState({});
-  const savedColors = analysisState?.color_map || {};
   const defaultColor = getCssVar("--red");
   const colorMap = useMemo(
-    () =>
+    () => {
+      const nextResults = Array.isArray(analysisState?.results) ? analysisState.results : [];
+      const savedColors = analysisState?.color_map || {};
+      return (
       Object.fromEntries(
-        results.map((item) => [
+        nextResults.map((item) => [
           item.name,
           colors[item.name] || savedColors[item.name] || defaultColor,
         ]),
-      ),
-    [results, savedColors, colors, defaultColor],
+      )
+      );
+    },
+    [analysisState, colors, defaultColor],
   );
   const [hiddenMap, setHiddenMap] = useState({});
   const [selectedPoints, setSelectedPoints] = useState([]);
