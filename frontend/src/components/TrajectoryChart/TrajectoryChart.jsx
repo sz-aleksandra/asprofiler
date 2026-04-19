@@ -145,6 +145,7 @@ export default function TrajectoryChart({
   selectedPoints,
   pointsBefore = 10,
   pointsAfter = 10,
+  formatTimeLabel,
 }) {
   const containerRef = useRef(null);
   const cssBlack = getCssVar("--black");
@@ -177,13 +178,13 @@ export default function TrajectoryChart({
         customdata: series.map((point) => [
           point.name,
           point.index,
-          point.time,
+          formatTimeLabel(point.time, point.absoluteTime),
           point.absoluteTime,
           point.speed,
           point.accel,
         ]),
         hovertemplate:
-          "%{fullData.name}<br>Time: %{customdata[2]:.1f} s<br>X: %{x:.2f} m<br>Y: %{y:.2f} m<br>Speed: %{customdata[4]:.3f} m/s<br>Acceleration: %{customdata[5]:.3f} m/s²<extra></extra>",
+          "%{fullData.name}<br>Time: %{customdata[2]}<br>X: %{x:.2f} m<br>Y: %{y:.2f} m<br>Speed: %{customdata[4]:.3f} m/s<br>Acceleration: %{customdata[5]:.3f} m/s²<extra></extra>",
       });
     });
 
@@ -193,7 +194,6 @@ export default function TrajectoryChart({
       const list = selectedByFile.get(point.name) || [];
       list.push({
         index: Number(point.index),
-        rawTime: Number(point.rawTime ?? point.time),
       });
       selectedByFile.set(point.name, list);
     });
@@ -236,15 +236,18 @@ export default function TrajectoryChart({
           mode: "markers",
           x: dotPoints.map((point) => point.x + X_OFFSET),
           y: dotPoints.map((point) => point.y),
-          customdata: dotPoints.map((point) => [point.time, point.speed, point.accel]),
+          customdata: dotPoints.map((point) => [
+            formatTimeLabel(point.time, point.absoluteTime),
+            point.speed,
+            point.accel,
+          ]),
           marker: {
             size: 7,
             color: baseColor,
             opacity: 0.85,
           },
           name: `${fileName} selected points`,
-          hovertemplate:
-            `${fileName}<br>Time: %{customdata[0]:.1f} s<br>X: %{x:.2f} m<br>Y: %{y:.2f} m<br>Speed: %{customdata[1]:.3f} m/s<br>Acceleration: %{customdata[2]:.3f} m/s²<extra></extra>`,
+          hovertemplate: `${fileName}<br>Time: %{customdata[0]}<br>X: %{x:.2f} m<br>Y: %{y:.2f} m<br>Speed: %{customdata[1]:.3f} m/s<br>Acceleration: %{customdata[2]:.3f} m/s²<extra></extra>`,
           showlegend: false,
         });
       }
@@ -255,7 +258,11 @@ export default function TrajectoryChart({
           mode: "markers",
           x: centers.map((point) => point.x + X_OFFSET),
           y: centers.map((point) => point.y),
-          customdata: centers.map((point) => [point.time, point.speed, point.accel]),
+          customdata: centers.map((point) => [
+            formatTimeLabel(point.time, point.absoluteTime),
+            point.speed,
+            point.accel,
+          ]),
           marker: {
             size: 11,
             symbol: "diamond",
@@ -263,8 +270,7 @@ export default function TrajectoryChart({
             line: { width: 0 },
           },
           name: `${fileName} selected center`,
-          hovertemplate:
-            `${fileName}<br>Time: %{customdata[0]:.1f} s<br>X: %{x:.2f} m<br>Y: %{y:.2f} m<br>Speed: %{customdata[1]:.3f} m/s<br>Acceleration: %{customdata[2]:.3f} m/s²<extra></extra>`,
+          hovertemplate: `${fileName}<br>Time: %{customdata[0]}<br>X: %{x:.2f} m<br>Y: %{y:.2f} m<br>Speed: %{customdata[1]:.3f} m/s<br>Acceleration: %{customdata[2]:.3f} m/s²<extra></extra>`,
           showlegend: false,
         });
       }
@@ -318,7 +324,7 @@ export default function TrajectoryChart({
     return () => {
       ro.disconnect();
     };
-  }, [cssBlack, colorMap, data, pointsBefore, pointsAfter, selectedPoints]);
+  }, [cssBlack, colorMap, data, formatTimeLabel, pointsBefore, pointsAfter, selectedPoints]);
 
   if (!data.length) return null;
 

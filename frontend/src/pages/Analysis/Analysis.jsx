@@ -216,6 +216,12 @@ export default function Analysis() {
     if (timeMode === "absolute" && point?.absoluteTime) return formatAbsoluteClock(point.absoluteTime);
     return formatSecondsClock(getPointDisplayTime(point));
   };
+  const formatTrajectoryTime = (seconds, absoluteTime) => {
+    if (timeMode === "absolute" && absoluteTime) return formatAbsoluteClock(absoluteTime, 1);
+    const value = Number(seconds);
+    if (!Number.isFinite(value)) return "—";
+    return formatSecondsClock(value, 1);
+  };
   const canUseAbsoluteTimeAxis =
     timeMode === "absolute" &&
     visibleResults.some(
@@ -224,7 +230,7 @@ export default function Analysis() {
         item.profile.timeseries.absolute_time.length > 0,
     );
   const formatTimeAxisTick = (value, label) =>
-    canUseAbsoluteTimeAxis && label ? formatAbsoluteClock(label) : formatSecondsClock(value);
+    canUseAbsoluteTimeAxis && label ? formatAbsoluteClock(label, 1) : formatSecondsClock(value, 1);
   const formatTimeHoverLabel = (value, label) =>
     canUseAbsoluteTimeAxis && label
       ? formatAbsoluteClock(label, 1)
@@ -534,6 +540,7 @@ export default function Analysis() {
         fitSlopeLabel={fitSlopeLabel}
         xTickFormatter={formatTimeAxisTick}
         xHoverFormatter={formatTimeHoverLabel}
+        formatTrajectoryTime={formatTrajectoryTime}
         speedSeriesUnitLabel={speedSeriesUnitLabel}
         speedSeriesUnit={speedSeriesUnit}
         setSpeedSeriesUnit={setSpeedSeriesUnit}

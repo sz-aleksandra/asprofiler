@@ -36,6 +36,7 @@ function AnalysisReport({
   fitSlopeLabel,
   xTickFormatter,
   xHoverFormatter,
+  formatTrajectoryTime,
   speedSeriesUnitLabel,
   speedSeriesUnit,
   setSpeedSeriesUnit,
@@ -384,6 +385,7 @@ function AnalysisReport({
               selectedPoints={visibleSelectedPoints}
               pointsBefore={pointsBefore}
               pointsAfter={pointsAfter}
+              formatTimeLabel={formatTrajectoryTime}
             />
           </div>
         )}
