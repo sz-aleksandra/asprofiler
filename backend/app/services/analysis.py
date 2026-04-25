@@ -10,14 +10,13 @@ from app.models import AnalyzeParams
 
 def load_series_stream(
     stream,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str] | None, list[float | None] | None, list[float | None] | None, int]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str] | None, list[float | None] | None, list[float | None] | None]:
     speeds = []
     accels = []
     times = []
     absolute_times = []
     latitudes = []
     longitudes = []
-    total_rows = 0
     reader = csv.DictReader(stream)
     if reader.fieldnames is None:
         raise HTTPException(status_code=400, detail="Missing CSV header")
@@ -38,7 +37,6 @@ def load_series_stream(
     lat_col = field_map.get("lat")
     lon_col = field_map.get("lon")
     for row in reader:
-        total_rows += 1
         try:
             t_raw = row.get(time_col, "")
             s_raw = row.get(speed_col, "")
@@ -80,26 +78,23 @@ def load_series_stream(
         absolute_times if absolute_time_col else None,
         latitudes if lat_col and len(latitudes) == len(times) else None,
         longitudes if lon_col and len(longitudes) == len(times) else None,
-        total_rows,
     )
 
 
 def _select_points(
     speeds: np.ndarray,
     accels: np.ndarray,
+    candidate_indices: np.ndarray,
     min_speed: float,
     bin_size: float,
     top_n: int,
-    positive_only: bool,
-) -> tuple[np.ndarray, np.ndarray]:
-    mask = speeds >= min_speed
-    if positive_only:
-        mask = mask & (accels > 0)
-    if not np.any(mask):
-        return np.array([]), np.array([])
+    selection_mode: str = "top",
+) -> np.ndarray:
+    if len(candidate_indices) == 0:
+        return np.array([], dtype=int)
 
-    s = speeds[mask]
-    a = accels[mask]
+    s = speeds[candidate_indices]
+    a = accels[candidate_indices]
 
     max_speed = float(np.max(s))
 
@@ -112,21 +107,21 @@ def _select_points(
         bins.append((current, current + bin_size))
         current += bin_size
 
-    picked_s = []
-    picked_a = []
+    picked_indices = []
     for lo, hi in bins:
         idx = (s >= lo) & (s < hi)
         if not np.any(idx):
             continue
-        s_bin = s[idx]
         a_bin = a[idx]
-        order = np.argsort(a_bin)[::-1]
+        bin_indices = candidate_indices[idx]
+        order = np.argsort(a_bin)
+        if selection_mode == "top":
+            order = order[::-1]
         take = order[:top_n]
         for i in take:
-            picked_s.append(float(s_bin[i]))
-            picked_a.append(float(a_bin[i]))
+            picked_indices.append(int(bin_indices[i]))
 
-    return np.array(picked_s, dtype=float), np.array(picked_a, dtype=float)
+    return np.array(picked_indices, dtype=int)
 
 
 def _fit_line(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
@@ -166,6 +161,13 @@ def _apply_ci_filter(
 
 
 def _stats(arr: np.ndarray) -> dict:
+    if len(arr) == 0:
+        return {
+            "min": None,
+            "mean": None,
+            "median": None,
+            "max": None,
+        }
     return {
         "min": float(np.min(arr)),
         "mean": float(np.mean(arr)),
@@ -186,45 +188,63 @@ def _confidence_level_to_z(confidence_level: float) -> float:
     return float(NormalDist().inv_cdf(tail_probability))
 
 
-def build_as_profile(
+def _build_directional_profile(
+    direction: str,
     times: np.ndarray,
     speeds: np.ndarray,
     accels: np.ndarray,
     absolute_times: list[str] | None,
-    latitudes: list[float | None] | None,
-    longitudes: list[float | None] | None,
     params: AnalyzeParams,
-    total_rows: int,
 ):
-    if params.positive_only:
-        pos_mask = accels > 0
+    if direction == "acceleration":
+        directional_mask = accels > 0
+        raw_accels = accels
+        selection_mode = "top"
     else:
-        pos_mask = np.ones_like(accels, dtype=bool)
+        directional_mask = accels < 0
+        raw_accels = accels
+        selection_mode = "bottom"
 
-    all_s = speeds[pos_mask]
-    all_a = accels[pos_mask]
+    base_mask = (speeds >= params.min_speed) & directional_mask
+    filtered_indices = np.where(base_mask)[0]
 
-    base_mask = speeds >= params.min_speed
-    if params.positive_only:
-        base_mask = base_mask & (accels > 0)
-    filtered_s = speeds[base_mask]
-    filtered_a = accels[base_mask]
-
-    x, y = _select_points(
+    selected_indices = _select_points(
         speeds,
-        accels,
+        raw_accels,
+        filtered_indices,
         min_speed=params.min_speed,
         bin_size=params.bin_size,
         top_n=params.top_n,
-        positive_only=params.positive_only,
+        selection_mode=selection_mode,
     )
-    if len(x) < 2:
-        raise HTTPException(status_code=400, detail="Not enough points after binning")
+    if len(selected_indices) < 2:
+        return {
+            "points": [],
+            "fit": None,
+            "meta": {
+                "min_speed": float(params.min_speed),
+                "bin_size": float(params.bin_size),
+                "top_n": int(params.top_n),
+                "confidence_level": float(params.confidence_level),
+            },
+        }
+
+    x = speeds[selected_indices]
+    y = raw_accels[selected_indices]
 
     intercept, slope = _fit_line(x, y)
     ci_z = _confidence_level_to_z(params.confidence_level)
+    y_hat = intercept + slope * x
+    residuals = y - y_hat
+    sigma = float(np.sqrt(np.sum(residuals**2) / (len(x) - 2))) if len(x) > 2 else 0.0
+    keep_mask = (
+        np.abs(residuals) <= (ci_z * sigma)
+        if len(x) > 2 and sigma != 0
+        else np.ones(len(x), dtype=bool)
+    )
     x2, y2 = _apply_ci_filter(x, y, intercept, slope, ci_z)
     if len(x2) >= 2 and (len(x2) != len(x)):
+        selected_indices = selected_indices[keep_mask]
         intercept, slope = _fit_line(x2, y2)
         x, y = x2, y2
 
@@ -232,19 +252,21 @@ def build_as_profile(
     r2 = _r2(y, y_hat)
     s0 = float(-intercept / slope) if slope != 0 else float("inf")
 
+    points = [
+        {
+            "index": int(idx),
+            "time": float(times[idx]),
+            "absolute_time": absolute_times[idx]
+            if absolute_times and idx < len(absolute_times)
+            else "",
+            "speed": float(speeds[idx]),
+            "accel": float(raw_accels[idx]),
+        }
+        for idx in selected_indices.tolist()
+    ]
+
     return {
-        "all_points": [
-            {"speed": float(xs), "accel": float(ys)}
-            for xs, ys in zip(all_s.tolist(), all_a.tolist())
-        ],
-        "all_points_filtered": [
-            {"speed": float(xs), "accel": float(ys)}
-            for xs, ys in zip(filtered_s.tolist(), filtered_a.tolist())
-        ],
-        "points": [
-            {"speed": float(xs), "accel": float(ys)}
-            for xs, ys in zip(x.tolist(), y.tolist())
-        ],
+        "points": points,
         "fit": {
             "model": "linear",
             "label": "Linear regression",
@@ -257,6 +279,46 @@ def build_as_profile(
                 {"speed": float(s0), "accel": 0.0},
             ],
         },
+        "meta": {
+            "min_speed": float(params.min_speed),
+            "bin_size": float(params.bin_size),
+            "top_n": int(params.top_n),
+            "confidence_level": float(params.confidence_level),
+        },
+    }
+
+
+def build_as_profile(
+    times: np.ndarray,
+    speeds: np.ndarray,
+    accels: np.ndarray,
+    absolute_times: list[str] | None,
+    latitudes: list[float | None] | None,
+    longitudes: list[float | None] | None,
+    params: AnalyzeParams,
+):
+    acceleration_profile = _build_directional_profile(
+        "acceleration",
+        times,
+        speeds,
+        accels,
+        absolute_times,
+        params,
+    )
+    deceleration_profile = _build_directional_profile(
+        "deceleration",
+        times,
+        speeds,
+        accels,
+        absolute_times,
+        params,
+    )
+
+    return {
+        "acceleration_profile": acceleration_profile,
+        "deceleration_profile": deceleration_profile,
+        "fit": acceleration_profile["fit"],
+        "points": acceleration_profile["points"],
         "timeseries": {
             "time": times.tolist(),
             "speed": speeds.tolist(),
@@ -283,19 +345,18 @@ def build_as_profile(
                 "area": _curve_area(times, speeds),
             },
             "acceleration": {
-                **_stats(accels),
-                "area": _curve_area(times, accels, absolute=True),
+                **_stats(accels[accels > 0]),
+                "area": _curve_area(times, np.where(accels > 0, accels, 0.0)),
+            },
+            "deceleration": {
+                **_stats(np.abs(accels[accels < 0])),
+                "area": _curve_area(times, np.where(accels < 0, np.abs(accels), 0.0)),
             },
         },
         "meta": {
-            "n_all_points": int(len(all_s)),
-            "n_all_points_filtered": int(len(filtered_s)),
-            "n_points": int(len(x)),
             "min_speed": float(params.min_speed),
             "bin_size": float(params.bin_size),
             "top_n": int(params.top_n),
-            "positive_only": bool(params.positive_only),
             "confidence_level": float(params.confidence_level),
-            "total_rows": int(total_rows),
         },
     }

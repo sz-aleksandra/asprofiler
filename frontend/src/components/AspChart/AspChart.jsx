@@ -5,9 +5,55 @@ import styles from "./AspChart.module.css";
 import { getCssVar } from "../../utils/getCssVar";
 import { hexToRgba } from "../../utils/hexToRgba";
 
+function getContextWindowPoints(allPoints, selectedIndex, pointsBefore, pointsAfter) {
+  const rangeFrom = selectedIndex - pointsBefore;
+  const rangeTo = selectedIndex + pointsAfter;
+  return allPoints.filter((point) => point.index >= rangeFrom && point.index <= rangeTo);
+}
+
+function buildContextTrace(itemName, windowPoints, selectedIndexSet, base, formatSpeed, asCustomData) {
+  const markerSizes = windowPoints.map((point) => (selectedIndexSet.has(point.index) ? 0 : 4));
+  return {
+    name: `${itemName} context`,
+    type: "scatter",
+    mode: "lines+markers",
+    x: windowPoints.map((point) => formatSpeed(point.speed)),
+    y: windowPoints.map((point) => point.accel),
+    customdata: windowPoints.map((point) => asCustomData(point, "context")),
+    line: {
+      color: base,
+      width: 1.5,
+    },
+    marker: {
+      size: markerSizes,
+      color: base,
+    },
+    showlegend: false,
+  };
+}
+
+function buildSelectedTrace(itemName, points, base, formatSpeed, asCustomData) {
+  return {
+    name: `${itemName} selected`,
+    type: "scatter",
+    mode: "markers",
+    x: points.map((point) => formatSpeed(point.speed)),
+    y: points.map((point) => point.accel),
+    customdata: points.map((point) => asCustomData(point, "selected")),
+    marker: {
+      size: 7,
+      color: base,
+      symbol: "diamond",
+    },
+    showlegend: false,
+  };
+}
+
 export default function AspChart({
   profiles,
   title = "Acceleration Speed Profile",
+  yAxisTitle = "Acceleration (m/s²)",
+  plotMultiplier = 1,
   colorMap,
   hiddenMap,
   formatSpeed = (value) => value,
@@ -29,8 +75,8 @@ export default function AspChart({
 
     const allTraces = [];
     const shapes = [];
-    const maxSpeedCandidates = valid.flatMap((v) => v.profile?.timeseries?.speed || []);
-    const maxAccelCandidates = valid.flatMap((v) => v.profile?.timeseries?.acceleration || []);
+    const maxSpeedCandidates = valid.flatMap((v) => v.timeseries?.speed || []);
+    const maxAccelCandidates = [];
     const globalMinSpeed = valid.reduce(
       (min, item) => Math.min(min, Number(item.profile?.meta?.min_speed ?? 0)),
       Number.POSITIVE_INFINITY,
@@ -39,74 +85,54 @@ export default function AspChart({
       (max, value) => Math.max(max, Number(value)),
       Number.NEGATIVE_INFINITY,
     );
-    const globalMaxAccel = maxAccelCandidates.reduce(
-      (max, value) => Math.max(max, Number(value)),
-      Number.NEGATIVE_INFINITY,
-    );
 
     valid.forEach((item) => {
       const base = colorMap?.[item.name];
       const profile = item.profile;
+      const timeseries = item.timeseries;
       const cutoff = Number(profile?.meta?.min_speed ?? 0);
-      const positiveOnly = Boolean(profile?.meta?.positive_only);
+      const multiplier = plotMultiplier;
       const {
         time: tsTime = [],
         absolute_time: tsAbsoluteTime = [],
         speed: tsSpeed = [],
         acceleration: tsAccel = [],
-      } = profile?.timeseries || {};
-      const toKey = (speed, accel) => `${Number(speed).toFixed(6)}|${Number(accel).toFixed(6)}`;
+      } = timeseries || {};
 
-      const all = (tsTime || []).map((t, i) => ({
-        index: i,
-        time: Number(t),
-        absoluteTime: tsAbsoluteTime[i] || "",
-        speed: Number(tsSpeed[i]),
-        accel: Number(tsAccel[i]),
+      const all = tsTime
+        .map((t, i) => ({
+          index: i,
+          time: Number(t),
+          absoluteTime: tsAbsoluteTime[i] || "",
+          speed: Number(tsSpeed[i]),
+          accel: Number(tsAccel[i]) * multiplier,
+        }));
+      all.forEach((point) => {
+        maxAccelCandidates.push(point.accel);
+      });
+      const directionalRaw = [...all]
+        .filter((point) => point.accel > 0)
+        .sort((a, b) => a.speed - b.speed);
+      const filteredDirectional = directionalRaw.filter((point) => point.speed >= cutoff);
+
+      const selected = profile.points.map((p) => ({
+        ...p,
+        accel: Number(p.accel) * multiplier,
       }));
-
-      const sortedAll = [...all].sort((a, b) => a.speed - b.speed);
-      const isIncluded = (point) =>
-        point.speed >= cutoff && (!positiveOnly || point.accel > 0);
-      const included = sortedAll.filter(isIncluded);
-      const rejected = sortedAll.filter((p) => !isIncluded(p));
-      const selectedRaw = Array.isArray(profile?.points) ? profile.points : [];
-      let selected = selectedRaw;
-      if (!selected.every((p) => Number.isInteger(p?.index) && Number.isFinite(Number(p?.time)))) {
-        const buckets = new Map();
-        all.forEach((p) => {
-          const key = toKey(p.speed, p.accel);
-          const list = buckets.get(key) || [];
-          list.push(p);
-          buckets.set(key, list);
-        });
-        selected = selectedRaw
-          .map((p) => {
-            const key = toKey(p?.speed, p?.accel);
-            const list = buckets.get(key);
-            if (list?.length) return list.shift();
-            let nearest = null;
-            let nearestDist = Number.POSITIVE_INFINITY;
-            all.forEach((candidate) => {
-              const ds = Number(candidate.speed) - Number(p?.speed);
-              const da = Number(candidate.accel) - Number(p?.accel);
-              const dist = ds * ds + da * da;
-              if (dist < nearestDist) {
-                nearestDist = dist;
-                nearest = candidate;
-              }
-            });
-            return nearest;
-          })
-          .filter(Boolean);
-      }
+      const selectedIndexSetForLayers = new Set(
+        selected.map((point) => Number(point.index)),
+      );
+      const rejected = all.filter((point) => point.accel <= 0 || point.speed < cutoff);
+      const included = filteredDirectional.filter(
+        (point) => !selectedIndexSetForLayers.has(point.index),
+      );
       const asCustomData = (point, kind) => [
         item.name,
-        Number.isInteger(point.index) ? point.index : -1,
-        Number.isFinite(Number(point.time)) ? Number(point.time) : null,
+        point.index,
+        point.time,
         point.absoluteTime || "",
-        Number(point.speed),
-        Number(point.accel),
+        point.speed,
+        point.accel,
         kind,
       ];
 
@@ -158,73 +184,63 @@ export default function AspChart({
         },
       });
 
-      if (sortedAll.length) {
+      if (profile.fit?.curve?.length) {
         const fitCurve = profile.fit.curve;
+        fitCurve.forEach((point) => {
+          maxAccelCandidates.push(Number(point.accel) * multiplier);
+        });
         allTraces.push({
           name: `${item.name} fit`,
           type: "scatter",
           mode: "lines",
           x: fitCurve.map((point) => formatSpeed(Number(point.speed))),
-          y: fitCurve.map((point) => Number(point.accel)),
+          y: fitCurve.map((point) => Number(point.accel) * multiplier),
           line: { color: base, width: 2 },
           showlegend: true,
         });
       }
 
-      const selectedForFile = (selectedPoints || []).filter(
-        (p) => p?.name === item.name && Number.isInteger(Number(p?.index)),
-      );
-        if (selectedForFile.length > 0 && all.length > 0) {
-          const byIndex = [...all].sort((a, b) => a.index - b.index);
-          const selectedIndexSet = new Set(selectedForFile.map((p) => Number(p.index)));
+      const selectedForFile = selectedPoints.filter((p) => p.name === item.name);
+      if (selectedForFile.length > 0 && all.length > 0) {
+        const byIndex = [...all].sort((a, b) => a.index - b.index);
+        const selectedIndexSet = new Set(selectedForFile.map((p) => Number(p.index)));
         const centers = [];
         selectedForFile.forEach((sel) => {
           const selectedIndex = Number(sel.index);
-          const rangeFrom = selectedIndex - pointsBefore;
-          const rangeTo = selectedIndex + pointsAfter;
-          const windowPoints = byIndex.filter((p) => p.index >= rangeFrom && p.index <= rangeTo);
+          const windowPoints = getContextWindowPoints(
+            byIndex,
+            selectedIndex,
+            pointsBefore,
+            pointsAfter,
+          );
           if (windowPoints.length > 1) {
-            const markerSizes = windowPoints.map((p) => (selectedIndexSet.has(p.index) ? 0 : 4));
-            allTraces.push({
-              name: `${item.name} context`,
-              type: "scatter",
-              mode: "lines+markers",
-              x: windowPoints.map((p) => formatSpeed(p.speed)),
-              y: windowPoints.map((p) => p.accel),
-              customdata: windowPoints.map((p) => asCustomData(p, "context")),
-              line: {
-                color: base,
-                width: 1.5,
-              },
-              marker: {
-                size: markerSizes,
-                color: base,
-              },
-              showlegend: false,
-            });
+            allTraces.push(
+              buildContextTrace(
+                item.name,
+                windowPoints,
+                selectedIndexSet,
+                base,
+                formatSpeed,
+                asCustomData,
+              ),
+            );
           }
           const center = byIndex.find((p) => p.index === selectedIndex);
           if (center) centers.push(center);
         });
         if (centers.length > 0) {
           const ordered = [...centers].sort((a, b) => a.index - b.index);
-          allTraces.push({
-            name: `${item.name} selected`,
-            type: "scatter",
-            mode: "markers",
-            x: ordered.map((p) => formatSpeed(p.speed)),
-            y: ordered.map((p) => p.accel),
-            customdata: ordered.map((p) => asCustomData(p, "selected")),
-            marker: {
-              size: 7,
-              color: base,
-              symbol: "diamond",
-            },
-            showlegend: false,
-          });
+          allTraces.push(
+            buildSelectedTrace(item.name, ordered, base, formatSpeed, asCustomData),
+          );
         }
       }
     });
+
+    const globalMaxAccel = maxAccelCandidates.reduce(
+      (max, value) => Math.max(max, Number(value)),
+      Number.NEGATIVE_INFINITY,
+    );
 
     return {
       traces: allTraces,
@@ -233,7 +249,7 @@ export default function AspChart({
       maxSpeed: Number.isFinite(globalMaxSpeed) ? formatSpeed(globalMaxSpeed) : 0,
       maxAccel: Number.isFinite(globalMaxAccel) ? globalMaxAccel : 0,
     };
-  }, [profiles, colorMap, hiddenMap, selectedPoints, pointsBefore, pointsAfter, formatSpeed]);
+  }, [profiles, plotMultiplier, colorMap, hiddenMap, selectedPoints, pointsBefore, pointsAfter, formatSpeed]);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;
@@ -250,7 +266,7 @@ export default function AspChart({
         range: [data.minSpeed, data.maxSpeed],
       },
       yaxis: {
-        title: { text: "Acceleration", font: { color: cssBlack } },
+        title: { text: yAxisTitle, font: { color: cssBlack } },
         tickfont: { color: cssBlack },
         range: [0, Math.max(0, data.maxAccel)],
       },
@@ -332,7 +348,7 @@ export default function AspChart({
       }
       ro.disconnect();
     };
-  }, [data, title, onPointSelect, onPointsSelect, speedUnitLabel]);
+  }, [data, title, yAxisTitle, onPointSelect, onPointsSelect, speedUnitLabel]);
 
   return <div className={styles.chart} ref={containerRef} />;
 }

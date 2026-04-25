@@ -1,4 +1,3 @@
-import logging
 import json
 from io import StringIO
 
@@ -16,7 +15,6 @@ from app.models import AnalyzeParams, AnalyzeResultsResponse
 from app.services.analysis import build_as_profile, load_series_stream
 
 router = APIRouter()
-logger = logging.getLogger("asp")
 
 
 class LoginPayload(BaseModel):
@@ -78,8 +76,7 @@ async def analyze_files(
         try:
             content = await uploaded.read()
             text = content.decode("utf-8-sig")
-            times, speeds, accels, absolute_times, latitudes, longitudes, total_rows = load_series_stream(StringIO(text))
-            logger.info("analyze transient %s rows=%d", name, total_rows)
+            times, speeds, accels, absolute_times, latitudes, longitudes = load_series_stream(StringIO(text))
             profile = build_as_profile(
                 times,
                 speeds,
@@ -88,7 +85,6 @@ async def analyze_files(
                 latitudes,
                 longitudes,
                 params,
-                total_rows,
             )
             results.append({"name": name, "profile": profile})
         except HTTPException as exc:

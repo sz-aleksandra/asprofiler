@@ -16,6 +16,8 @@ function AnalysisReport({
   setColors,
   allShown,
   shownCount,
+  accelerationAspProfiles,
+  decelerationAspProfiles,
   onAspPointSelect,
   onAspPointsSelect,
   visibleSelectedPoints,
@@ -29,10 +31,10 @@ function AnalysisReport({
   speedReferenceLines,
   speedDistributionChart,
   accelerationDistributionChart,
+  decelerationDistributionChart,
   fmt,
   formatSpeedPair,
   formatDistanceKm,
-  formatTimeSummary,
   fitSlopeLabel,
   xTickFormatter,
   xHoverFormatter,
@@ -47,6 +49,27 @@ function AnalysisReport({
   preprocessing,
   analysisParams,
 }) {
+  const reportAspRows = [
+    ...results.map((item) => ({
+      key: `${item.name}-acceleration`,
+      fileName: item.name,
+      profileLabel: "Acceleration",
+      fit: item.profile?.acceleration_profile?.fit || null,
+      plotMultiplier: 1,
+      color: colorMap[item.name],
+      hidden: hiddenMap[item.name],
+    })),
+    ...results.map((item) => ({
+      key: `${item.name}-deceleration`,
+      fileName: item.name,
+      profileLabel: "Deceleration",
+      fit: item.profile?.deceleration_profile?.fit || null,
+      plotMultiplier: -1,
+      color: colorMap[item.name],
+      hidden: hiddenMap[item.name],
+    })),
+  ];
+
   return (
     <>
       <div className={`${styles.timeseriesGrid} ${styles.timeseriesGridCompact}`}>
@@ -161,57 +184,61 @@ function AnalysisReport({
         <div className={`${styles.reportRow} ${styles.head}`}>
           <div className={styles.reportCellToggle}></div>
           <div className={styles.reportCellName}>Filename</div>
-          <div className={styles.reportCellMetric}>Time</div>
+          <div className={styles.reportCellMetric}>Profile</div>
           <div className={styles.reportCellFit}>ASP Equation</div>
           <div className={styles.reportCellMetric}>A0 (m/s²)</div>
           <div className={styles.reportCellMetric}>S0</div>
           <div className={styles.reportCellColor}>Color</div>
         </div>
-        {results.map((item) => (
-          <div
-            className={styles.reportRow}
-            key={item.name}
-            style={{ background: hexToRgba(colorMap[item.name], 0.1) }}
-          >
-            <div className={styles.reportCellToggle}>
-              <input
-                type="checkbox"
-                checked={!hiddenMap[item.name]}
-                onChange={(e) => {
-                  setHiddenMap((prev) => ({
-                    ...prev,
-                    [item.name]: !e.target.checked,
-                  }));
-                }}
-              />
+        {reportAspRows.map((row) => {
+          const displayA0 =
+            row.fit?.A0 != null ? Number(row.fit.A0) * row.plotMultiplier : null;
+          const displaySlope =
+            row.fit?.AS_slope != null ? Number(row.fit.AS_slope) * row.plotMultiplier : null;
+          return (
+            <div
+              className={styles.reportRow}
+              key={row.key}
+              style={{ background: hexToRgba(row.color, 0.1) }}
+            >
+              <div className={styles.reportCellToggle}>
+                <input
+                  type="checkbox"
+                  checked={!row.hidden}
+                  onChange={(e) => {
+                    setHiddenMap((prev) => ({
+                      ...prev,
+                      [row.fileName]: !e.target.checked,
+                    }));
+                  }}
+                />
+              </div>
+              <div className={styles.reportCellName}>{row.fileName}</div>
+              <div className={styles.reportCellMetric}>{row.profileLabel}</div>
+              <div className={styles.reportCellFit}>
+                {displayA0 != null && displaySlope != null
+                  ? `a = ${fmt(displayA0)} + (${fitSlopeLabel(displaySlope)}) · v`
+                  : "—"}
+              </div>
+              <div className={styles.reportCellMetric}>
+                {displayA0 != null ? fmt(displayA0) : "—"}
+              </div>
+              <div className={styles.reportCellMetric}>
+                {row.fit?.S0 != null ? formatSpeedPair(row.fit.S0) : "—"}
+              </div>
+              <div className={styles.reportCellColor}>
+                <input
+                  type="color"
+                  className={styles.colorInput}
+                  value={row.color}
+                  onChange={(e) => {
+                    setColors((prev) => ({ ...prev, [row.fileName]: e.target.value }));
+                  }}
+                />
+              </div>
             </div>
-            <div className={styles.reportCellName}>{item.name}</div>
-            <div className={styles.reportCellMetric}>
-              {formatTimeSummary(item.profile?.timeseries)}
-            </div>
-            <div className={styles.reportCellFit}>
-              {item.profile?.fit?.A0 != null && item.profile?.fit?.AS_slope != null
-                ? `a = ${fmt(item.profile.fit.A0)} + (${fitSlopeLabel(item.profile.fit.AS_slope)}) · v`
-                : "—"}
-            </div>
-            <div className={styles.reportCellMetric}>
-              {item.profile?.fit?.A0 != null ? fmt(item.profile.fit.A0) : "—"}
-            </div>
-            <div className={styles.reportCellMetric}>
-              {item.profile?.fit?.S0 != null ? formatSpeedPair(item.profile.fit.S0) : "—"}
-            </div>
-            <div className={styles.reportCellColor}>
-              <input
-                type="color"
-                className={styles.colorInput}
-                value={colorMap[item.name]}
-                onChange={(e) => {
-                  setColors((prev) => ({ ...prev, [item.name]: e.target.value }));
-                }}
-              />
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {visibleResults.length === 0 ? (
@@ -219,7 +246,23 @@ function AnalysisReport({
       ) : (
         <>
         <AspChart
-          profiles={visibleResults}
+          profiles={accelerationAspProfiles}
+          title="Acceleration Speed Profile"
+          yAxisTitle="Acceleration (m/s²)"
+          plotMultiplier={1}
+          colorMap={colorMap}
+          onPointSelect={onAspPointSelect}
+          onPointsSelect={onAspPointsSelect}
+          selectedPoints={visibleSelectedPoints}
+          pointsBefore={pointsBefore}
+          pointsAfter={pointsAfter}
+        />
+
+        <AspChart
+          profiles={decelerationAspProfiles}
+          title="Deceleration Speed Profile"
+          yAxisTitle="Deceleration (m/s²)"
+          plotMultiplier={-1}
           colorMap={colorMap}
           onPointSelect={onAspPointSelect}
           onPointsSelect={onAspPointsSelect}
@@ -369,6 +412,16 @@ function AnalysisReport({
               barMode={accelerationDistributionChart.barMode}
               xAxis={accelerationDistributionChart.xAxis}
               yAxis={accelerationDistributionChart.yAxis}
+            />
+          )}
+          {decelerationDistributionChart && (
+            <DistributionChart
+              key={decelerationDistributionChart.title}
+              title={decelerationDistributionChart.title}
+              traces={decelerationDistributionChart.traces}
+              barMode={decelerationDistributionChart.barMode}
+              xAxis={decelerationDistributionChart.xAxis}
+              yAxis={decelerationDistributionChart.yAxis}
             />
           )}
         </div>
