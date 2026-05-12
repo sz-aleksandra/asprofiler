@@ -1,0 +1,24 @@
+.label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--black);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.select {
+  box-sizing: border-box;
+  min-width: 110px;
+  height: 30px;
+  padding: 6px 8px;
+  border: 1px solid var(--black);
+  border-radius: 6px;
+  align-self: center;
+  background: white;
+  color: var(--black);
+}
+
+.select:disabled {
+  opacity: 0.5;
+}

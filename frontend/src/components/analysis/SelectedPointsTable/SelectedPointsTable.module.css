@@ -1,0 +1,181 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--sidebar-border, var(--black));
+  background: transparent;
+}
+
+.toolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.selectAll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--sidebar-text, var(--black));
+}
+
+.count {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: var(--sidebar-text, var(--black));
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  text-align: left;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--sidebar-text, var(--black));
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.numberInput {
+  box-sizing: border-box;
+  min-width: 72px;
+  width: 72px;
+  height: 30px;
+  padding: 6px 8px;
+  border: 1px solid var(--sidebar-input-border, var(--black));
+  border-radius: 6px;
+  align-self: center;
+  background: var(--sidebar-input-bg, white);
+  color: var(--black);
+}
+
+.numberInput:disabled {
+  opacity: 0.5;
+}
+
+.dangerBtn {
+  background: var(--red);
+  color: var(--white);
+  border: 1px solid var(--white);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dangerBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dangerBtn:hover {
+  background: red;
+  color: white;
+  border: 1px solid white;
+}
+
+.table {
+  border: none;
+  border-radius: 0;
+  overflow-y: auto;
+  max-height: 600px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 44px 1fr 120px 120px 120px 120px;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--sidebar-border, var(--black));
+  background: transparent;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.head {
+  font-weight: 600;
+  color: var(--sidebar-text, var(--black));
+  background: transparent;
+}
+
+.cellCheckbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sortBtn {
+  border: none;
+  background: transparent;
+  color: var(--sidebar-text, var(--black));
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sortBtnFixed {
+  width: 120px;
+}
+
+.file {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sidebar-text, var(--black));
+}
+
+.col {
+  text-align: left;
+  color: var(--sidebar-text, var(--black));
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.empty {
+  padding: 12px 14px;
+  color: var(--sidebar-text, var(--black));
+  background: transparent;
+  border-bottom: 1px solid var(--sidebar-border, var(--black));
+}
+
+.removeBtn {
+  background: var(--red);
+  color: var(--white);
+  border: 1px solid var(--white);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.removeBtn:hover {
+  background: red;
+  color: white;
+  border: 1px solid white;
+}

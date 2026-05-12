@@ -1,5 +1,9 @@
 import { useState } from "react";
-import headerStyles from "../../components/Header/Header.module.css";
+
+import Button from "../../ui/Button/Button";
+import Input from "../../ui/form/controls/Input/Input";
+
+import headerStyles from "../../components/shared/Header/Header.module.css";
 import filesListStyles from "../FilesList/FilesList.module.css";
 import styles from "./Login.module.css";
 
@@ -32,19 +36,17 @@ export default function Login({ error = "", isLoading = false, onSubmit }) {
           <form className={styles.form} onSubmit={handleSubmit}>
             <label className={filesListStyles.controlLabel}>
               Password
-              <input
-                autoComplete="current-password"
-                className={filesListStyles.controlInput}
+              <Input
+                type="password"
                 onChange={(event) => setInputValue(event.target.value)}
                 placeholder="Enter password"
-                type="password"
                 value={inputValue}
               />
             </label>
             {error ? <p className={styles.error}>{error}</p> : null}
-            <button className={`${filesListStyles.dangerBtn} ${styles.loginButton}`} type="submit">
+            <Button variant="primary" type="submit" className={styles.loginButton}>
               Unlock
-            </button>
+            </Button>
           </form>
         )}
       </div>

@@ -1,10 +1,39 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 
-import { useAnalysisLayout } from "../../components/Layout/AnalysisLayoutContext";
-import { getCssVar } from "../../utils/getCssVar";
-import AnalysisReport from "./AnalysisReport";
-import AnalysisToolbar from "./AnalysisToolbar";
+import useAnalysisData from "../../hooks/analysis/useAnalysisData";
+import useAnalysisPreferences from "../../hooks/analysis/useAnalysisPreferences";
+import usePointSelection from "../../hooks/analysis/usePointSelection";
+import useLocalStorage from "../../hooks/shared/useLocalStorage";
+import { useAnalysisLayout } from "../../components/shared/Layout/AnalysisLayoutContext";
+import { getCssVar } from "../../utils/shared/getCssVar";
+import {
+  makeTimeFormatters,
+  formatNumber,
+  formatSpeedPair,
+  fitSlopeLabel,
+} from "../../utils/analysis/analysisFormatters";
+import {
+  DEFAULT_ANALYSIS_PARAMS,
+  DEFAULT_PREPROCESSING,
+} from "../../utils/shared/analysisConstants";
+import { buildAnalysisProfileRows } from "../../utils/shared/analysisRows";
+import {
+  buildAnalysisTableConfig,
+  EARLY_LATE_TABLE_GRID_COLUMNS,
+  EVENT_TABLE_GRID_COLUMNS,
+  STATS_TABLE_GRID_COLUMNS,
+} from "../../utils/analysis/analysisTableConfig";
+import ScopeSwitch from "../../components/shared/ScopeSwitch/ScopeSwitch";
+import AnalysisDataTable from "../../components/analysis/AnalysisDataTable/AnalysisDataTable";
+import AnalysisParametersForm from "../../components/shared/AnalysisParametersForm/AnalysisParametersForm";
+import AnalysisProfilesTable from "../../components/analysis/AnalysisProfilesTable/AnalysisProfilesTable";
+import AspChart from "../../components/analysis/AspChart/AspChart";
+import DistributionChart from "../../components/analysis/DistributionChart/DistributionChart";
+import TimeSeriesChart from "../../components/analysis/TimeSeriesChart/TimeSeriesChart";
+import TrajectoryChart from "../../components/analysis/TrajectoryChart/TrajectoryChart";
+import AnalysisSidebar from "../../components/analysis/AnalysisSidebar/AnalysisSidebar";
+import { hexToRgba } from "../../utils/shared/hexToRgba";
 
 import styles from "./Analysis.module.css";
 
@@ -16,495 +45,100 @@ export default function Analysis() {
 
   const analysisState = location.state;
   const results = Array.isArray(analysisState?.results) ? analysisState.results : [];
+  const savedColors = analysisState?.color_map || {};
 
-  const [colors, setColors] = useState({});
   const defaultColor = getCssVar("--red");
-  const colorMap = useMemo(() => {
-    const nextResults = Array.isArray(analysisState?.results) ? analysisState.results : [];
-    const savedColors = analysisState?.color_map || {};
-    return Object.fromEntries(
-      nextResults.map((item) => [
-        item.name,
-        colors[item.name] || savedColors[item.name] || defaultColor,
-      ]),
-    );
-  }, [analysisState, colors, defaultColor]);
+  const [colors, setColors] = useState({});
   const [hiddenMap, setHiddenMap] = useState({});
-  const [selectedPoints, setSelectedPoints] = useState([]);
-  const [markedPointMap, setMarkedPointMap] = useState({});
-  const [pointsBefore, setPointsBefore] = useState(10);
-  const [pointsAfter, setPointsAfter] = useState(10);
-  const [pointsSortRules, setPointsSortRules] = useState([]);
-  const [speedSeriesUnit, setSpeedSeriesUnit] = useState(
-    () => localStorage.getItem("analysis_speed_series_unit") || "m/s",
-  );
-  const [timeMode, setTimeMode] = useState(
-    () => localStorage.getItem("analysis_time_mode") || "relative",
-  );
-  const [distributionScale, setDistributionScale] = useState(
-    () => localStorage.getItem("analysis_distribution_scale") || "log",
-  );
-  const analysisParams = useMemo(() => {
-    const defaults = {
-      min_speed: 3,
-      bin_size: 0.2,
-      top_n: 2,
-      confidence_level: 0.95,
-    };
-    try {
-      const raw = localStorage.getItem("analysis_params");
-      if (raw) return { ...defaults, ...JSON.parse(raw) };
-    } catch {
-      // ignore
-    }
-    return defaults;
-  }, []);
-  const preprocessing = useMemo(() => {
-    const defaults = {
-      filter_window: 5,
-      filter_mode: "median_mean",
-      hacc_threshold: 2,
-    };
-    if (analysisState?.preprocessing) {
-      return { ...defaults, ...analysisState.preprocessing };
-    }
-    try {
-      const raw = localStorage.getItem("analysis_preprocessing");
-      if (raw) return { ...defaults, ...JSON.parse(raw) };
-    } catch {
-      // ignore
-    }
-    return defaults;
-  }, [analysisState]);
-  const getRelativePointTime = (name, rawTime) => {
-    const numericTime = Number(rawTime);
-    if (!Number.isFinite(numericTime)) return rawTime;
-    const item = results.find((entry) => entry.name === name);
-    const firstTime = Number(item.profile.timeseries.time[0]);
-    if (!Number.isFinite(firstTime)) return numericTime;
-    return numericTime - firstTime;
-  };
-  const getPointDisplayTime = (point) => {
-    const rawTime = point?.rawTime ?? point?.time;
-    if (timeMode === "absolute") return rawTime;
-    return getRelativePointTime(point?.name, rawTime);
-  };
-  const visibleResults = results.filter((r) => !hiddenMap[r.name]);
-  const pointKey = (p) => `${p.name}::${p.index}`;
-  const visibleFileNames = new Set(visibleResults.map((r) => r.name));
-  const visibleSelectedPoints = selectedPoints.filter((p) => visibleFileNames.has(p.name));
-  const selectedVisibleCount = visibleSelectedPoints.filter(
-    (p) => markedPointMap[pointKey(p)],
-  ).length;
-  const filteredSelectedPoints = (() => {
-    const sorted = [...visibleSelectedPoints];
-    if (!pointsSortRules.length) return sorted;
 
-    sorted.sort((a, b) => {
-      for (const rule of pointsSortRules) {
-        let cmp = 0;
-        if (rule.key === "name") cmp = String(a.name).localeCompare(String(b.name));
-        if (rule.key === "time")
-          cmp = Number(getPointDisplayTime(a)) - Number(getPointDisplayTime(b));
-        if (rule.key === "speed") cmp = Number(a.speed) - Number(b.speed);
-        if (rule.key === "accel") cmp = Number(a.accel) - Number(b.accel);
-        if (cmp !== 0) return rule.dir === "asc" ? cmp : -cmp;
-      }
-      return 0;
-    });
-    return sorted;
-  })();
-
-  const toggleSortRule = (key) => {
-    setPointsSortRules((prev) => {
-      const idx = prev.findIndex((r) => r.key === key);
-      if (idx === -1) return [...prev, { key, dir: "asc" }];
-      const current = prev[idx];
-      if (current.dir === "asc") {
-        const next = [...prev];
-        next[idx] = { ...current, dir: "desc" };
-        return next;
-      }
-      return prev.filter((r) => r.key !== key);
-    });
-  };
-
-  const sortBadge = (key) => {
-    const idx = pointsSortRules.findIndex((r) => r.key === key);
-    if (idx === -1) return "";
-    const dir = pointsSortRules[idx].dir === "asc" ? "↑" : "↓";
-    return ` ${dir}(${idx + 1})`;
-  };
-
-  useEffect(() => {
-    localStorage.setItem("analysis_time_mode", timeMode);
-  }, [timeMode]);
-
-  useEffect(() => {
-    localStorage.setItem("analysis_speed_series_unit", speedSeriesUnit);
-  }, [speedSeriesUnit]);
-
-  useEffect(() => {
-    localStorage.setItem("analysis_distribution_scale", distributionScale);
-  }, [distributionScale]);
-
-  const toKmh = (value) => Number(value) * 3.6;
-  const speedSeriesFactor = speedSeriesUnit === "km/h" ? 3.6 : 1;
-  const speedSeriesUnitLabel = speedSeriesUnit;
-  const formatSecondsClock = (value, fractionDigits = 0) => {
-    if (value === undefined || value === null || Number.isNaN(value)) return "—";
-    const totalSeconds = Number(value);
-    const sign = totalSeconds < 0 ? "-" : "";
-    const safeSeconds = Math.abs(totalSeconds);
-    const hours = Math.floor(safeSeconds / 3600);
-    const minutes = Math.floor((safeSeconds % 3600) / 60);
-    const secondsValue = safeSeconds % 60;
-    const secondsText =
-      fractionDigits > 0
-        ? secondsValue.toFixed(fractionDigits).padStart(3 + fractionDigits, "0")
-        : String(Math.floor(secondsValue)).padStart(2, "0");
-    return `${sign}${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${secondsText}`;
-  };
-  const formatAbsoluteClock = (value, fractionDigits = 0) => {
-    const raw = String(value || "").trim();
-    if (!raw) return "—";
-    const parts = raw.split(":");
-    if (parts.length !== 3) return raw;
-    const hours = Number(parts[0]);
-    const minutes = Number(parts[1]);
-    const seconds = Number(parts[2]);
-    if (!Number.isFinite(hours) || !Number.isFinite(minutes) || !Number.isFinite(seconds)) {
-      return raw;
-    }
-    const secondsText =
-      fractionDigits > 0
-        ? seconds.toFixed(fractionDigits).padStart(3 + fractionDigits, "0")
-        : String(Math.floor(seconds)).padStart(2, "0");
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${secondsText}`;
-  };
-  const formatSpeedPair = (value) => {
-    if (value === undefined || value === null || Number.isNaN(value)) return "—";
-    return `${Number(value).toFixed(3)} m/s (${toKmh(value).toFixed(3)} km/h)`;
-  };
-  const formatDistanceKm = (value) => {
-    if (value === undefined || value === null || Number.isNaN(value)) return "—";
-    return `${(Number(value) / 1000).toFixed(3)} km`;
-  };
-  const fitSlopeLabel = (value) => {
-    if (value === undefined || value === null || Number.isNaN(value)) return "—";
-    return `${Number(value).toFixed(3)}`;
-  };
-  const formatPointTime = (point) => {
-    if (timeMode === "absolute" && point?.absoluteTime)
-      return formatAbsoluteClock(point.absoluteTime);
-    return formatSecondsClock(getPointDisplayTime(point));
-  };
-  const formatTrajectoryTime = (seconds, absoluteTime) => {
-    if (timeMode === "absolute" && absoluteTime) return formatAbsoluteClock(absoluteTime, 1);
-    const value = Number(seconds);
-    if (!Number.isFinite(value)) return "—";
-    return formatSecondsClock(value, 1);
-  };
-  const canUseAbsoluteTimeAxis =
-    timeMode === "absolute" &&
-    visibleResults.some(
-      (item) =>
-        Array.isArray(item.profile.timeseries.absolute_time) &&
-        item.profile.timeseries.absolute_time.length > 0,
-    );
-  const formatTimeAxisTick = (value, label) =>
-    canUseAbsoluteTimeAxis && label ? formatAbsoluteClock(label, 1) : formatSecondsClock(value, 1);
-  const formatTimeHoverLabel = (value, label) =>
-    canUseAbsoluteTimeAxis && label ? formatAbsoluteClock(label, 1) : formatSecondsClock(value, 1);
-
-  const getRelativeTimeAxis = (timeValues) => {
-    if (!Array.isArray(timeValues) || !timeValues.length) return [];
-    const first = Number(timeValues[0]);
-    if (!Number.isFinite(first)) return timeValues.map((value) => Number(value));
-    return timeValues.map((value) => Number(value) - first);
-  };
-
-  const combinedTimeseries = (() => {
-    const speedSeries = [];
-    const accelerationSeries = [];
-
-    visibleResults.forEach((item) => {
-      const ts = item.profile.timeseries;
-      const color = colorMap[item.name];
-      const seriesName = item.name;
-
-      if (ts.time.length && ts.speed.length) {
-        speedSeries.push({
-          name: seriesName,
-          values: ts.speed.map((value) => Number(value) * speedSeriesFactor),
-          color,
-          x: timeMode === "absolute" ? ts.time : getRelativeTimeAxis(ts.time),
-          labels: timeMode === "absolute" ? ts.absolute_time : [],
-        });
-      }
-      if (ts.time.length && ts.acceleration.length) {
-        accelerationSeries.push({
-          name: seriesName,
-          values: ts.acceleration,
-          color,
-          x: timeMode === "absolute" ? ts.time : getRelativeTimeAxis(ts.time),
-          labels: timeMode === "absolute" ? ts.absolute_time : [],
-        });
-      }
-    });
-
-    return { speedSeries, accelerationSeries };
-  })();
-  const xAxisTitle = canUseAbsoluteTimeAxis ? "Absolute time" : "Time from start";
-  const speedReferenceLines = visibleResults
-    .map((item) => ({
-      y: Number(item?.profile?.meta?.min_speed) * speedSeriesFactor,
-      color: colorMap[item.name],
-      width: 1.5,
-      dash: "dash",
-    }))
-    .filter((line) => Number.isFinite(line.y));
-
-  const combinedStatsRows = (() => {
-    const rows = [];
-    visibleResults.forEach((item) => {
-      const stats = item.profile?.stats || {};
-      rows.push({
-        fileName: item.name,
-        metricLabel: "Speed",
-        values: stats.speed,
-        metric: "speed",
-      });
-    });
-    visibleResults.forEach((item) => {
-      const stats = item.profile?.stats || {};
-      rows.push({
-        fileName: item.name,
-        metricLabel: "Acceleration",
-        values: stats.acceleration,
-        metric: "acceleration",
-      });
-    });
-    visibleResults.forEach((item) => {
-      const stats = item.profile?.stats || {};
-      rows.push({
-        fileName: item.name,
-        metricLabel: "Deceleration",
-        values: stats.deceleration,
-        metric: "deceleration",
-      });
-    });
-    return rows;
-  })();
-
-  const accelerationAspProfiles = useMemo(
+  const colorMap = useMemo(
     () =>
-      visibleResults
-        .map((item) => {
-          const profile = item.profile?.acceleration_profile;
-          return profile
-            ? {
-                name: item.name,
-                profile,
-                timeseries: item.profile.timeseries,
-              }
-            : null;
-        })
-        .filter(Boolean),
-    [visibleResults],
+      Object.fromEntries(
+        results.map((item) => [
+          item.name,
+          colors[item.name] || savedColors[item.name] || defaultColor,
+        ]),
+      ),
+    [results, colors, savedColors, defaultColor],
   );
 
-  const decelerationAspProfiles = useMemo(
-    () =>
-      visibleResults
-        .map((item) => {
-          const profile = item.profile?.deceleration_profile;
-          return profile
-            ? {
-                name: item.name,
-                profile,
-                timeseries: item.profile.timeseries,
-              }
-            : null;
-        })
-        .filter(Boolean),
-    [visibleResults],
+  const [storedAnalysisParameters] = useLocalStorage("analysis_params", DEFAULT_ANALYSIS_PARAMS);
+  const analysisParameters = useMemo(
+    () => ({ ...DEFAULT_ANALYSIS_PARAMS, ...storedAnalysisParameters }),
+    [storedAnalysisParameters],
   );
 
-  const distributionCharts = (() => {
-    const getMetricValues = (values, filterValue = () => true, mapValue = (value) => value) =>
-      values.filter(filterValue).map(mapValue);
-
-    const buildBinTrace = (item, values, minValue, xAxisRangeEnd, title, unit) => {
-      const binMap = new Map();
-
-      values.forEach((value) => {
-        const clampedValue = Math.min(value, xAxisRangeEnd);
-        const binStart = minValue + Math.floor((clampedValue - minValue) / 1) * 1;
-        const keyName = String(binStart);
-        const count = binMap.get(keyName) || 0;
-        binMap.set(keyName, count + 1);
-      });
-
-      const x = [];
-      const y = [];
-      const customdata = [];
-      for (let binStart = minValue; binStart < xAxisRangeEnd; binStart += 1) {
-        x.push(binStart + 0.5);
-        y.push(binMap.get(String(binStart)) || 0);
-        customdata.push([binStart, binStart + 1]);
-      }
-
-      return {
-        key: item.name,
-        type: "bar",
-        name: item.name,
-        x,
-        y,
-        customdata,
-        width: 1,
-        marker: { color: colorMap[item.name] },
-        hovertemplate:
-          `${item.name}<br>${title}: %{customdata[0]:.0f} to %{customdata[1]:.0f} ${unit}` +
-          `<br>Count: %{y}<extra></extra>`,
-        showlegend: true,
-      };
-    };
-
-    const buildMetricChart = ({
-      key,
-      title,
-      unit,
-      filterValue = () => true,
-      mapValue = (value) => value,
-    }) => {
-      const allValues = visibleResults.flatMap((item) =>
-        getMetricValues(item.profile.timeseries[key], filterValue, mapValue),
-      );
-      const minValue = allValues.length ? Math.floor(Math.min(...allValues)) : 0;
-      const maxValue = allValues.length ? Math.ceil(Math.max(...allValues)) : 0;
-      const xAxisRangeEnd = Math.max(1, maxValue);
-      const traces = visibleResults
-        .map((item) => {
-          const values = getMetricValues(item.profile.timeseries[key], filterValue, mapValue);
-          if (!values.length) return null;
-          return buildBinTrace(item, values, minValue, xAxisRangeEnd, title, unit);
-        })
-        .filter(Boolean);
-
-      if (!traces.length) return null;
-      return {
-        key,
-        title,
-        traces,
-          barMode: "overlay",
-          xAxis: {
-            title: { text: unit },
-            type: "linear",
-            range: [minValue, xAxisRangeEnd],
-          },
-          yAxis: {
-            title: { text: "Count" },
-            type: distributionScale === "log" ? "log" : "linear",
-            rangemode: "tozero",
-        },
-      };
-    };
-
-    return [
-      buildMetricChart({
-        key: "acceleration",
-        title: "Acceleration Distribution",
-        unit: "m/s²",
-        filterValue: (value) => value > 0,
-      }),
-      buildMetricChart({
-        key: "acceleration",
-        title: "Deceleration Distribution",
-        unit: "m/s²",
-        filterValue: (value) => value < 0,
-        mapValue: (value) => Math.abs(value),
-      }),
-      buildMetricChart({ key: "speed", title: "Speed Distribution", unit: "m/s" }),
-    ].filter(Boolean);
-  })();
-
-  const fmt = (v) =>
-    v === undefined || v === null || Number.isNaN(v) ? "—" : Number(v).toFixed(3);
-  const fmtWithUnit = (v, unit) => {
-    if (v === undefined || v === null || Number.isNaN(v)) return "—";
-    return `${Number(v).toFixed(3)} ${unit}`;
-  };
-  const metricUnits = (metric) => {
-    if (metric === "speed") return { value: "m/s", area: "km" };
-    if (metric === "acceleration") return { value: "m/s²", area: "m/s" };
-    if (metric === "deceleration") return { value: "m/s²", area: "m/s" };
-    return { value: "", area: null };
-  };
-  const allShown = results.length > 0 && results.every((r) => !hiddenMap[r.name]);
-  const shownCount = results.filter((r) => !hiddenMap[r.name]).length;
-  const speedDistributionChart = distributionCharts.find((chart) => chart.key === "speed");
-  const accelerationDistributionChart = distributionCharts.find(
-    (chart) => chart.key === "acceleration" && chart.title === "Acceleration Distribution",
+  const [storedPreprocessing] = useLocalStorage("analysis_preprocessing", DEFAULT_PREPROCESSING);
+  const preprocessingParameters = useMemo(
+    () => ({
+      ...DEFAULT_PREPROCESSING,
+      ...storedPreprocessing,
+      ...(analysisState?.preprocessing_parameters || {}),
+    }),
+    [analysisState, storedPreprocessing],
   );
-  const decelerationDistributionChart = distributionCharts.find(
-    (chart) => chart.key === "acceleration" && chart.title === "Deceleration Distribution",
-  );
-  const onAspPointSelect = (point) => {
-    const idx = Number(point?.index);
-    const t = Number(point?.time);
-    if (!point?.name || !Number.isInteger(idx) || idx < 0 || !Number.isFinite(t)) return;
-    const key = `${point.name}::${idx}`;
-    setSelectedPoints((prev) => {
-      const exists = prev.some((p) => `${p.name}::${p.index}` === key);
-      if (exists) {
-        setMarkedPointMap((map) => {
-          const next = { ...map };
-          delete next[key];
-          return next;
-        });
-        return prev.filter((p) => `${p.name}::${p.index}` !== key);
-      }
-      return [
-        ...prev,
-        {
-          ...point,
-          index: idx,
-          time: t,
-          rawTime: t,
-        },
-      ];
+
+  const prefs = useAnalysisPreferences();
+  const data = useAnalysisData(results, hiddenMap, colorMap, prefs, analysisParameters);
+  const points = usePointSelection(data.visibleResults, prefs.timeMode);
+  const timeFmt = makeTimeFormatters(prefs.timeMode, data.canUseAbsoluteTimeAxis);
+
+  const {
+    speedSeriesUnit,
+    profilingSpeedUnit,
+    eventSpeedUnit,
+    distributionScale,
+    setDistributionScale,
+    eventBinMode,
+    setEventBinMode,
+    eventScopeMode,
+    setEventScopeMode,
+    eventZoneMode,
+    setEventZoneMode,
+    eventPhaseMode,
+    setEventPhaseMode,
+    statisticsScopeMode,
+    setStatisticsScopeMode,
+    profileViewMode,
+    setProfileViewMode,
+  } = prefs;
+
+  const {
+    visibleResults,
+    allShown,
+    shownCount,
+    xAxisTitle,
+    accelerationAspProfiles,
+    decelerationAspProfiles,
+    combinedTimeseries,
+    speedReferenceLines,
+    combinedStatsRows,
+    accelerationEventRows,
+    decelerationEventRows,
+    speedDistributionChart,
+    accelerationDistributionChart,
+    decelerationDistributionChart,
+    metricUnits,
+    formatEventBinLabel,
+  } = data;
+
+  const isForceProfile = profileViewMode === "force";
+  const hasAccelerationProfiles = accelerationAspProfiles.length > 0;
+  const hasDecelerationProfiles = decelerationAspProfiles.length > 0;
+  const hasAccelerationEvents = accelerationEventRows.length > 0;
+  const hasDecelerationEvents = decelerationEventRows.length > 0;
+
+  const { statsTableData, statsColumns, buildEventColumns, buildEarlyLateEventColumns } =
+    buildAnalysisTableConfig({
+      styles,
+      isForceProfile,
+      results,
+      metricUnits,
+      formatEventBinLabel,
+      combinedStatsRows,
     });
-  };
-  const onAspPointsSelect = (points) => {
-    if (!Array.isArray(points) || !points.length) return;
-    setSelectedPoints((prev) => {
-      const existing = new Set(prev.map((p) => `${p.name}::${p.index}`));
-      const additions = points
-        .map((point) => {
-          const idx = Number(point?.index);
-          const t = Number(point?.time);
-          if (!point?.name || !Number.isInteger(idx) || idx < 0 || !Number.isFinite(t)) {
-            return null;
-          }
-          const key = `${point.name}::${idx}`;
-          if (existing.has(key)) return null;
-          existing.add(key);
-          return {
-            ...point,
-            index: idx,
-            time: t,
-            rawTime: t,
-          };
-        })
-        .filter(Boolean);
-      if (!additions.length) return prev;
-      return [...prev, ...additions];
-    });
-  };
-  const allPointsMarked =
-    visibleSelectedPoints.length > 0 &&
-    visibleSelectedPoints.every((p) => Boolean(markedPointMap[pointKey(p)]));
+
+  const reportAspRows = buildAnalysisProfileRows({ results, colorMap, hiddenMap });
 
   if (results.length === 0) {
     return (
@@ -523,71 +157,328 @@ export default function Analysis() {
         <>
           <div className={styles.drawerBackdropOpen} onClick={() => setToolsOpen(false)} />
           <aside className={styles.toolsDrawerOpen}>
-            <AnalysisToolbar
-              visibleSelectedPoints={visibleSelectedPoints}
-              allPointsMarked={allPointsMarked}
-              markedPointMap={markedPointMap}
-              setMarkedPointMap={setMarkedPointMap}
-              pointKey={pointKey}
-              selectedVisibleCount={selectedVisibleCount}
-              pointsBefore={pointsBefore}
-              setPointsBefore={setPointsBefore}
-              pointsAfter={pointsAfter}
-              setPointsAfter={setPointsAfter}
-              setSelectedPoints={setSelectedPoints}
-              filteredSelectedPoints={filteredSelectedPoints}
-              toggleSortRule={toggleSortRule}
-              sortBadge={sortBadge}
-              timeMode={timeMode}
-              formatSpeedPair={formatSpeedPair}
-              formatPointTime={formatPointTime}
-              fmt={fmt}
+            <AnalysisSidebar
+              visibleSelectedPoints={points.visibleSelectedPoints}
+              allPointsMarked={points.allPointsMarked}
+              markedPointMap={points.markedPointMap}
+              setMarkedPointMap={points.setMarkedPointMap}
+              pointKey={points.pointKey}
+              selectedVisibleCount={points.selectedVisibleCount}
+              pointsBefore={points.pointsBefore}
+              setPointsBefore={points.setPointsBefore}
+              pointsAfter={points.pointsAfter}
+              setPointsAfter={points.setPointsAfter}
+              setSelectedPoints={points.setSelectedPoints}
+              filteredSelectedPoints={points.filteredSelectedPoints}
+              toggleSortRule={points.toggleSortRule}
+              sortBadge={points.sortBadge}
+              formatPointTime={timeFmt.formatPointTime}
             />
           </aside>
         </>
       )}
-      <AnalysisReport
-        results={results}
-        visibleResults={visibleResults}
-        colorMap={colorMap}
-        hiddenMap={hiddenMap}
-        setHiddenMap={setHiddenMap}
-        setColors={setColors}
+
+      <div className={`${styles.timeseriesGrid} ${styles.timeseriesGridCompact}`}>
+        <AnalysisParametersForm
+          analysisParameters={analysisParameters}
+          preprocessingParameters={preprocessingParameters}
+          profilingSpeedUnit={profilingSpeedUnit}
+          eventSpeedUnit={eventSpeedUnit}
+          disabled
+        />
+      </div>
+
+      <div className={`${styles.toolbar} ${styles.toolbarNoBorder}`}>
+        <div className={styles.selectionControls}>
+          <ScopeSwitch
+            label="Profile view"
+            value={profileViewMode}
+            onChange={setProfileViewMode}
+            options={[
+              { value: "speed", label: "Acceleration-Speed Profile" },
+              { value: "force", label: "Force-Velocity Profile" },
+            ]}
+          />
+        </div>
+      </div>
+
+      <AnalysisProfilesTable
+        rows={reportAspRows}
         allShown={allShown}
         shownCount={shownCount}
-        accelerationAspProfiles={accelerationAspProfiles}
-        decelerationAspProfiles={decelerationAspProfiles}
-        onAspPointSelect={onAspPointSelect}
-        onAspPointsSelect={onAspPointsSelect}
-        visibleSelectedPoints={visibleSelectedPoints}
-        pointsBefore={pointsBefore}
-        pointsAfter={pointsAfter}
-        combinedStatsRows={combinedStatsRows}
-        metricUnits={metricUnits}
-        fmtWithUnit={fmtWithUnit}
-        combinedTimeseries={combinedTimeseries}
-        xAxisTitle={xAxisTitle}
-        speedReferenceLines={speedReferenceLines}
-        speedDistributionChart={speedDistributionChart}
-        accelerationDistributionChart={accelerationDistributionChart}
-        decelerationDistributionChart={decelerationDistributionChart}
-        fmt={fmt}
+        resultsCount={results.length}
+        onToggleAll={(checked) => {
+          if (checked) {
+            setHiddenMap({});
+            return;
+          }
+          const next = {};
+          results.forEach((item) => {
+            next[`${item.name}::acceleration`] = true;
+            next[`${item.name}::deceleration`] = true;
+          });
+          setHiddenMap(next);
+        }}
+        onToggleRow={(row, checked) => {
+          setHiddenMap((prev) => ({
+            ...prev,
+            [`${row.fileName}::${row.profileLabel.toLowerCase()}`]: !checked,
+          }));
+        }}
+        onColorChange={(fileName, color) => setColors((prev) => ({ ...prev, [fileName]: color }))}
+        formatNumber={formatNumber}
         formatSpeedPair={formatSpeedPair}
-        formatDistanceKm={formatDistanceKm}
         fitSlopeLabel={fitSlopeLabel}
-        xTickFormatter={formatTimeAxisTick}
-        xHoverFormatter={formatTimeHoverLabel}
-        formatTrajectoryTime={formatTrajectoryTime}
-        speedSeriesUnitLabel={speedSeriesUnitLabel}
-        speedSeriesUnit={speedSeriesUnit}
-        setSpeedSeriesUnit={setSpeedSeriesUnit}
-        timeMode={timeMode}
-        setTimeMode={setTimeMode}
-        distributionScale={distributionScale}
-        setDistributionScale={setDistributionScale}
-        preprocessing={preprocessing}
-        analysisParams={analysisParams}
+        isForceProfile={isForceProfile}
       />
+
+      {visibleResults.length === 0 ? (
+        <div className={styles.empty}>All series hidden. Use "Show".</div>
+      ) : (
+        <>
+          {hasAccelerationProfiles && (
+            <AspChart
+              profiles={accelerationAspProfiles}
+              title={
+                isForceProfile
+                  ? "Acceleration Force-Velocity Profile"
+                  : "Acceleration-Speed Profile"
+              }
+              yAxisTitle={isForceProfile ? "Force (N)" : "Acceleration (m/s²)"}
+              plotMultiplier={1}
+              valueMode={isForceProfile ? "force" : "acceleration"}
+              colorMap={colorMap}
+              onPointSelect={points.onAspPointSelect}
+              onPointsSelect={points.onAspPointsSelect}
+              selectedPoints={points.visibleSelectedPoints}
+              pointsBefore={points.pointsBefore}
+              pointsAfter={points.pointsAfter}
+            />
+          )}
+
+          {hasDecelerationProfiles && (
+            <AspChart
+              profiles={decelerationAspProfiles}
+              title={
+                isForceProfile
+                  ? "Deceleration Force-Velocity Profile"
+                  : "Deceleration-Speed Profile"
+              }
+              yAxisTitle={isForceProfile ? "Force (N)" : "Deceleration (m/s²)"}
+              plotMultiplier={-1}
+              valueMode={isForceProfile ? "force" : "acceleration"}
+              colorMap={colorMap}
+              onPointSelect={points.onAspPointSelect}
+              onPointsSelect={points.onAspPointsSelect}
+              selectedPoints={points.visibleSelectedPoints}
+              pointsBefore={points.pointsBefore}
+              pointsAfter={points.pointsAfter}
+            />
+          )}
+
+          <section className={styles.fileSection}>
+            <div className={`${styles.toolbar} ${styles.toolbarNoBorder}`}>
+              <div className={styles.selectionControls}>
+                <ScopeSwitch
+                  label="Statistics scope"
+                  value={statisticsScopeMode}
+                  onChange={setStatisticsScopeMode}
+                  options={[
+                    { value: "all", label: "All samples" },
+                    { value: "high_speed_running", label: "High-speed running only" },
+                  ]}
+                />
+                <ScopeSwitch
+                  label="Pitch zone"
+                  value={eventZoneMode}
+                  onChange={setEventZoneMode}
+                  options={[
+                    { value: "full", label: "Full pitch" },
+                    { value: "left", label: "Left third" },
+                    { value: "middle", label: "Middle third" },
+                    { value: "right", label: "Right third" },
+                  ]}
+                />
+              </div>
+            </div>
+
+            <AnalysisDataTable
+              title="Filtered GPS data statistics"
+              columns={statsColumns}
+              rows={statsTableData}
+              getRowKey={(row) => `${row.fileName}-${row.metric}`}
+              getRowStyle={(row) => ({ background: hexToRgba(colorMap[row.fileName], 0.1) })}
+              gridTemplateColumns={STATS_TABLE_GRID_COLUMNS}
+            />
+
+            <div className={`${styles.timeseriesGrid} ${styles.timeseriesGridCompact}`}>
+              <TimeSeriesChart
+                title="Speed"
+                yTitle={`Speed (${speedSeriesUnit})`}
+                series={combinedTimeseries.speedSeries}
+                valueLabelFormatter={() => "Speed"}
+                xTitle={xAxisTitle}
+                xIncludeZero={xAxisTitle === "Time from start"}
+                xTickFormatter={timeFmt.xTickFormatter}
+                xHoverFormatter={timeFmt.xHoverFormatter}
+                selectedPoints={points.visibleSelectedPoints}
+                pointsBefore={points.pointsBefore}
+                pointsAfter={points.pointsAfter}
+                yReferenceLines={speedReferenceLines}
+              />
+            </div>
+            <div className={styles.timeseriesGrid}>
+              <TimeSeriesChart
+                title={isForceProfile ? "Force" : "Acceleration"}
+                yTitle={isForceProfile ? "Force (N)" : "Acceleration (m/s²)"}
+                series={combinedTimeseries.accelerationSeries}
+                valueLabelFormatter={(value) => {
+                  if (isForceProfile) return "Force";
+                  return Number(value) < 0 ? "Deceleration" : "Acceleration";
+                }}
+                xTitle={xAxisTitle}
+                xIncludeZero={xAxisTitle === "Time from start"}
+                xTickFormatter={timeFmt.xTickFormatter}
+                xHoverFormatter={timeFmt.xHoverFormatter}
+                selectedPoints={points.visibleSelectedPoints}
+                pointsBefore={points.pointsBefore}
+                pointsAfter={points.pointsAfter}
+              />
+            </div>
+
+            {visibleResults.some(
+              (item) =>
+                Array.isArray(item?.profile?.timeseries?.latitude) &&
+                Array.isArray(item?.profile?.timeseries?.longitude),
+            ) && (
+              <div className={styles.timeseriesGrid}>
+                <TrajectoryChart
+                  profiles={visibleResults}
+                  colorMap={colorMap}
+                  selectedPoints={points.visibleSelectedPoints}
+                  pointsBefore={points.pointsBefore}
+                  pointsAfter={points.pointsAfter}
+                  formatTimeLabel={timeFmt.formatTrajectoryTime}
+                  valueMode={isForceProfile ? "force" : "acceleration"}
+                />
+              </div>
+            )}
+
+            <div className={`${styles.timeseriesGrid} ${styles.timeseriesGridCompact}`}>
+              <div className={`${styles.toolbar} ${styles.toolbarNoBorder}`}>
+                <div className={styles.selectionControls}>
+                  <ScopeSwitch
+                    label="Distribution scale"
+                    value={distributionScale}
+                    onChange={setDistributionScale}
+                    options={[
+                      { value: "linear", label: "Linear" },
+                      { value: "log", label: "Log" },
+                    ]}
+                  />
+                </div>
+              </div>
+              {speedDistributionChart && (
+                <DistributionChart key={speedDistributionChart.key} {...speedDistributionChart} />
+              )}
+              {accelerationDistributionChart && (
+                <DistributionChart
+                  key={accelerationDistributionChart.key}
+                  {...accelerationDistributionChart}
+                />
+              )}
+              {decelerationDistributionChart && (
+                <DistributionChart
+                  key={decelerationDistributionChart.key}
+                  {...decelerationDistributionChart}
+                />
+              )}
+              <div className={`${styles.toolbar} ${styles.toolbarNoBorder}`}>
+                <div className={styles.selectionControls}>
+                  <ScopeSwitch
+                    label="Event scope"
+                    value={eventScopeMode}
+                    onChange={setEventScopeMode}
+                    options={[
+                      { value: "all", label: "All events" },
+                      { value: "high_speed_running", label: "High-speed running only" },
+                    ]}
+                  />
+                  <ScopeSwitch
+                    label="Pitch zone"
+                    value={eventZoneMode}
+                    onChange={setEventZoneMode}
+                    options={[
+                      { value: "full", label: "Full pitch" },
+                      { value: "left", label: "Left third" },
+                      { value: "middle", label: "Middle third" },
+                      { value: "right", label: "Right third" },
+                    ]}
+                  />
+                  <ScopeSwitch
+                    label="Event bins"
+                    value={eventBinMode}
+                    onChange={setEventBinMode}
+                    options={[
+                      { value: "classic", label: "Classic" },
+                      { value: "detailed", label: "Detailed" },
+                    ]}
+                  />
+                  <ScopeSwitch
+                    label="View"
+                    value={eventPhaseMode}
+                    onChange={setEventPhaseMode}
+                    options={[
+                      { value: "overall", label: "Entire Event" },
+                      { value: "early_late", label: "Phase split" },
+                    ]}
+                  />
+                </div>
+              </div>
+              {hasAccelerationEvents &&
+                (eventPhaseMode === "early_late" ? (
+                  <AnalysisDataTable
+                    title="Acceleration event early/late phase statistics"
+                    columns={buildEarlyLateEventColumns("acceleration")}
+                    rows={accelerationEventRows}
+                    getRowKey={(row) => `${row.fileName}-acceleration-event-earlylate-${row.bin}`}
+                    getRowStyle={(row) => ({ background: hexToRgba(colorMap[row.fileName], 0.08) })}
+                    gridTemplateColumns={EARLY_LATE_TABLE_GRID_COLUMNS}
+                  />
+                ) : (
+                  <AnalysisDataTable
+                    title="Acceleration event statistics"
+                    columns={buildEventColumns("PP", "HPI", "Ratio (A:D)", "acceleration")}
+                    rows={accelerationEventRows}
+                    getRowKey={(row) => `${row.fileName}-acceleration-event-${row.bin}`}
+                    getRowStyle={(row) => ({ background: hexToRgba(colorMap[row.fileName], 0.08) })}
+                    gridTemplateColumns={EVENT_TABLE_GRID_COLUMNS}
+                  />
+                ))}
+              {hasDecelerationEvents &&
+                (eventPhaseMode === "early_late" ? (
+                  <AnalysisDataTable
+                    title="Deceleration event early/late phase statistics"
+                    columns={buildEarlyLateEventColumns("deceleration")}
+                    rows={decelerationEventRows}
+                    getRowKey={(row) => `${row.fileName}-deceleration-event-earlylate-${row.bin}`}
+                    getRowStyle={(row) => ({ background: hexToRgba(colorMap[row.fileName], 0.08) })}
+                    gridTemplateColumns={EARLY_LATE_TABLE_GRID_COLUMNS}
+                  />
+                ) : (
+                  <AnalysisDataTable
+                    title="Deceleration event statistics"
+                    columns={buildEventColumns("BP", "HBI", "Ratio (D:A)", "deceleration")}
+                    rows={decelerationEventRows}
+                    getRowKey={(row) => `${row.fileName}-deceleration-event-${row.bin}`}
+                    getRowStyle={(row) => ({ background: hexToRgba(colorMap[row.fileName], 0.08) })}
+                    gridTemplateColumns={EVENT_TABLE_GRID_COLUMNS}
+                  />
+                ))}
+            </div>
+          </section>
+        </>
+      )}
     </section>
   );
 }

@@ -53,74 +53,11 @@
   }
 }
 
-.toolsDrawerOpen .toolbar,
-.toolsDrawerOpen .table,
-.toolsDrawerOpen .selectionTable,
-.toolsDrawerOpen .row,
-.toolsDrawerOpen .selectionEmpty {
-  border-color: var(--white);
-}
-
-.toolsDrawerOpen .head,
-.toolsDrawerOpen .count,
-.toolsDrawerOpen .selectAll,
-.toolsDrawerOpen .cellFit,
-.toolsDrawerOpen .cellMetric,
-.toolsDrawerOpen .selectionLabel,
-.toolsDrawerOpen .selectionCol,
-.toolsDrawerOpen .selectionSortBtn,
-.toolsDrawerOpen .selectionFile,
-.toolsDrawerOpen .selectionEmpty,
-.toolsDrawerOpen .cellCheckbox,
-.toolsDrawerOpen .cellName {
-  color: var(--white);
-}
-
-.toolsDrawerOpen .colorInput,
-.toolsDrawerOpen .selectionInput,
-.toolsDrawerOpen .selectionSelect {
-  border-color: var(--white);
-  background: white;
-  color: var(--black);
-}
-
-.controls {
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-  border: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin-top: 14px;
-}
-
-.drawerSection {
-  display: flex;
-  flex-direction: column;
-}
-
-.drawerSectionTitle {
-  padding: 12px 14px;
-  font-weight: 600;
-  color: var(--white);
-}
-
-.parameterSection {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sectionTitle {
-  font-weight: 600;
-  color: var(--black);
-}
-
-.parameterSectionTitle {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--black);
-  margin-bottom: 8px;
+.toolsDrawerOpen {
+  --sidebar-border: var(--white);
+  --sidebar-text: var(--white);
+  --sidebar-input-border: var(--white);
+  --sidebar-input-bg: white;
 }
 
 .toolbar {
@@ -137,101 +74,6 @@
   padding-bottom: 0;
 }
 
-.toolbarLeft {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.selectAll {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  color: var(--black);
-}
-
-.count {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  color: var(--black);
-}
-
-.colorInput {
-  width: 40px;
-  height: 36px;
-  padding: 0;
-  border: 1px solid var(--black);
-  border-radius: 8px;
-}
-
-.colorInput::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-
-.colorInput::-webkit-color-swatch {
-  border: none;
-  border-radius: 7px;
-}
-
-.table {
-  border: none;
-  border-radius: 0;
-  overflow: hidden;
-}
-
-.row {
-  display: grid;
-  grid-template-columns: 44px 1fr 210px 120px 120px 120px;
-  gap: 10px;
-  align-items: center;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--black);
-  background: transparent;
-}
-
-.row:last-child {
-  border-bottom: none;
-}
-
-.head {
-  font-weight: 600;
-  color: var(--black);
-  background: transparent;
-}
-
-.cellCheckbox {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.cellName {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.cellColor {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.cellFit {
-  color: var(--black);
-  font-variant-numeric: tabular-nums;
-  text-align: left;
-}
-
-.cellMetric {
-  color: var(--black);
-  font-variant-numeric: tabular-nums;
-  text-align: left;
-}
-
 .empty {
   border-radius: 0;
   padding: 12px 14px;
@@ -245,93 +87,15 @@
   gap: 14px;
 }
 
-.reportTable {
-  border: none;
-  border-radius: 16px;
-  background: white;
-  padding: 8px;
-  overflow: hidden;
-}
-
-.reportRow {
-  display: grid;
-  grid-template-columns: 44px minmax(280px, 2fr) repeat(4, minmax(140px, 1fr)) 88px;
-  gap: 10px;
-  align-items: center;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--black);
-  background: transparent;
-}
-
-.toolbarFilesRow {
-  grid-template-columns: 44px minmax(0, 1fr) 72px;
-}
-
-.reportRow:last-child {
-  border-bottom: none;
-}
-
-.reportCellName {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.reportCellToggle,
-.reportCellColor,
-.reportCellFit,
-.reportCellMetric {
-  color: var(--black);
-  font-variant-numeric: tabular-nums;
-  text-align: left;
-}
-
-.reportCellToggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.reportCellColor {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.reportSummary {
-  padding: 10px 14px 4px;
-  font-size: 12px;
-  color: var(--black);
-}
-
-.statsCard {
-  border: none;
-  border-radius: 16px;
-  background: white;
-  padding: 8px;
-}
-
-.statsRow {
-  display: grid;
-  grid-template-columns: minmax(280px, 2fr) repeat(5, minmax(52px, 1fr));
-  gap: 8px;
-  align-items: center;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--black);
-}
-
-.statsRow:last-child {
-  border-bottom: none;
-}
-
-.statsHead {
-  font-weight: 600;
-  color: var(--black);
+.stackedStatValue {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .statsHeadWithHelp {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
@@ -356,7 +120,7 @@
   left: 50%;
   bottom: calc(100% + 8px);
   transform: translateX(-50%);
-  width: 330px;
+  width: 300px;
   padding: 8px 10px;
   border-radius: 8px;
   background: var(--black);
@@ -397,6 +161,26 @@
   color: var(--black);
 }
 
+.earlyLateCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.2;
+}
+
+.earlyValue {
+}
+
+.lateValue {
+  color: var(--text-muted, #555);
+}
+
+.ratioValue {
+  color: var(--text-muted, #888);
+  font-style: italic;
+  font-size: 0.9em;
+}
+
 .timeseriesGrid {
   display: grid;
   grid-template-columns: 1fr;
@@ -407,159 +191,10 @@
   gap: 8px;
 }
 
-.selectionSection {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.selectionToolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--black);
-}
-
-.selectionTable {
-  border: none;
-  border-radius: 0;
-  overflow-y: auto;
-  max-height: 600px;
-}
-
-.selectionRow {
-  grid-template-columns: 44px 1fr 120px 120px 120px 120px;
-  gap: 10px;
-}
-
-.selectionHead {
-  font-weight: 600;
-}
-
-.selectionSortBtn {
-  border: none;
-  background: transparent;
-  color: var(--black);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  padding: 0;
-}
-
-.selectionSortBtnFixed {
-  width: 120px;
-}
-
 .selectionControls {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
   text-align: left;
-}
-
-.selectionLabel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--black);
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.selectionInput {
-  min-width: 72px;
-  width: 72px;
-  padding: 6px 8px;
-  border: 1px solid var(--black);
-  border-radius: 6px;
-  align-self: center;
-  background: white;
-  color: var(--black);
-}
-
-.selectionSelect {
-  min-width: 110px;
-  padding: 6px 8px;
-  border: 1px solid var(--black);
-  border-radius: 6px;
-  align-self: center;
-  background: white;
-  color: var(--black);
-}
-
-.selectionInput:disabled,
-.selectionSelect:disabled {
-  opacity: 0.5;
-}
-
-.selectionCellCheckbox {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.selectionFile {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.selectionCol {
-  text-align: left;
-  color: var(--black);
-  font-size: inherit;
-  font-variant-numeric: tabular-nums;
-}
-
-.selectionActions {
-  display: flex;
-  justify-content: flex-end;
-  margin-left: auto;
-}
-
-.selectionDangerBtn {
-  background: var(--red);
-  color: var(--white);
-  border: 1px solid var(--white);
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.selectionDangerBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.selectionDangerBtn:hover {
-  background: red;
-  color: white;
-  border: 1px solid white;
-}
-
-.selectionRemoveBtn {
-  background: var(--red);
-  color: var(--white);
-  border: 1px solid var(--white);
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.selectionRemoveBtn:hover {
-  background: red;
-  color: white;
-  border: 1px solid white;
-}
-
-.selectionEmpty {
-  padding: 12px 14px;
-  color: var(--black);
-  background: transparent;
 }

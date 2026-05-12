@@ -1,289 +1,184 @@
-import csv
-import math
-from statistics import NormalDist
+from __future__ import annotations
+
+from dataclasses import dataclass
 
 import numpy as np
-from fastapi import HTTPException
 
-from app.models import AnalyzeParams
+from app.schemas.analysis import AnalyzeParameters
+from app.services.event_detection import (
+    detect_directional_events,
+    detect_directional_events_in_windows,
+)
+from app.services.event_summarization import summarize_directional_events
+from app.services.hsr import detect_high_speed_running_windows, detect_per_zone_hsr_windows
+from app.services.pitch_zones import (
+    ZONE_NAMES,
+    build_statistics_rows,
+    build_x_by_index,
+    build_zone_by_index,
+    summarize_pitch_zone_stats,
+    tag_events_with_zone,
+)
+from app.services.sample_distributions import summarize_sample_distributions
+from app.services.profiles import Profile, build_profile
+from app.utils.math import curve_area, stats
 
 
-def load_series_stream(
-    stream,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str] | None, list[float | None] | None, list[float | None] | None]:
-    speeds = []
-    accels = []
-    times = []
-    absolute_times = []
-    latitudes = []
-    longitudes = []
-    reader = csv.DictReader(stream)
-    if reader.fieldnames is None:
-        raise HTTPException(status_code=400, detail="Missing CSV header")
-    field_map = {name.strip().lower(): name for name in reader.fieldnames}
-    if (
-        "time" not in field_map
-        or "speed" not in field_map
-        or "acceleration" not in field_map
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail="CSV must contain time, speed, acceleration columns",
-        )
-    time_col = field_map["time"]
-    absolute_time_col = field_map.get("absolute_time")
-    speed_col = field_map["speed"]
-    accel_col = field_map["acceleration"]
-    lat_col = field_map.get("lat")
-    lon_col = field_map.get("lon")
-    for row in reader:
-        try:
-            t_raw = row.get(time_col, "")
-            s_raw = row.get(speed_col, "")
-            a_raw = row.get(accel_col, "")
-            if t_raw is None or s_raw is None or a_raw is None:
-                continue
-            t = float(str(t_raw).strip())
-            s = float(str(s_raw).strip())
-            a = float(str(a_raw).strip())
-        except (ValueError, TypeError):
-            continue
-        if math.isnan(t) or math.isnan(s) or math.isnan(a):
-            continue
-        speeds.append(s)
-        accels.append(a)
-        times.append(t)
-        if absolute_time_col:
-            absolute_times.append(str(row.get(absolute_time_col, "") or "").strip())
-        if lat_col:
-            lat_raw = row.get(lat_col, "")
-            try:
-                latitudes.append(float(str(lat_raw).strip()))
-            except (ValueError, TypeError):
-                latitudes.append(None)
-        if lon_col:
-            lon_raw = row.get(lon_col, "")
-            try:
-                longitudes.append(float(str(lon_raw).strip()))
-            except (ValueError, TypeError):
-                longitudes.append(None)
-
-    if not speeds:
-        raise HTTPException(status_code=400, detail="No valid speed/accel rows found")
-
-    return (
-        np.array(times, dtype=float),
-        np.array(speeds, dtype=float),
-        np.array(accels, dtype=float),
-        absolute_times if absolute_time_col else None,
-        latitudes if lat_col and len(latitudes) == len(times) else None,
-        longitudes if lon_col and len(longitudes) == len(times) else None,
+def resolve_file_parameters(
+    file_name: str,
+    default_parameters: AnalyzeParameters,
+    per_file_parameters: dict[str, dict],
+) -> AnalyzeParameters:
+    return AnalyzeParameters(
+        **(per_file_parameters.get(file_name) or default_parameters.model_dump())
     )
 
 
-def _select_points(
+@dataclass
+class _DirectionConfig:
+    direction: str
+    minimum_value_for_event_start: float
+    minimum_event_duration_seconds: float
+
+
+def _detect_events_for_direction(
+    times: np.ndarray,
     speeds: np.ndarray,
-    accels: np.ndarray,
-    candidate_indices: np.ndarray,
-    min_speed: float,
-    bin_size: float,
-    top_n: int,
-    selection_mode: str = "top",
-) -> np.ndarray:
-    if len(candidate_indices) == 0:
-        return np.array([], dtype=int)
+    accelerations: np.ndarray,
+    absolute_times: list[str] | None,
+    latitudes: list[float | None] | None,
+    longitudes: list[float | None] | None,
+    body_mass_kg: float,
+    config: _DirectionConfig,
+    x_by_index: dict[int, float] | None,
+    global_high_speed_running_windows: list[tuple[int, int]],
+    per_zone_high_speed_running_windows: dict[str, list[tuple[int, int]]],
+) -> dict[str, dict[str, list[dict]]]:
+    common_args = (times, speeds, accelerations, absolute_times, latitudes, longitudes, body_mass_kg, config.direction)
+    detect_args = (config.minimum_value_for_event_start, config.minimum_event_duration_seconds)
 
-    s = speeds[candidate_indices]
-    a = accels[candidate_indices]
+    global_all = tag_events_with_zone(
+        detect_directional_events(*common_args, *detect_args),
+        x_by_index,
+    )
+    global_hsr = tag_events_with_zone(
+        detect_directional_events_in_windows(*common_args, *detect_args, global_high_speed_running_windows),
+        x_by_index,
+    )
 
-    max_speed = float(np.max(s))
-
-    bins = []
-    start = float(min_speed)
-    end = max_speed + bin_size
-
-    current = start
-    while current < end:
-        bins.append((current, current + bin_size))
-        current += bin_size
-
-    picked_indices = []
-    for lo, hi in bins:
-        idx = (s >= lo) & (s < hi)
-        if not np.any(idx):
-            continue
-        a_bin = a[idx]
-        bin_indices = candidate_indices[idx]
-        order = np.argsort(a_bin)
-        if selection_mode == "top":
-            order = order[::-1]
-        take = order[:top_n]
-        for i in take:
-            picked_indices.append(int(bin_indices[i]))
-
-    return np.array(picked_indices, dtype=int)
-
-
-def _fit_line(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
-    if len(x) < 2:
-        raise ValueError("Not enough points to fit")
-    slope, intercept = np.polyfit(x, y, 1)
-    return float(intercept), float(slope)
-
-
-def _r2(y: np.ndarray, y_hat: np.ndarray) -> float:
-    ss_res = float(np.sum((y - y_hat) ** 2))
-    ss_tot = float(np.sum((y - np.mean(y)) ** 2))
-    if ss_tot == 0:
-        return 0.0
-    return 1.0 - (ss_res / ss_tot)
-
-
-def _apply_ci_filter(
-    x: np.ndarray,
-    y: np.ndarray,
-    intercept: float,
-    slope: float,
-    ci_z: float,
-) -> tuple[np.ndarray, np.ndarray]:
-    y_hat = intercept + slope * x
-    n = len(x)
-    if n <= 2:
-        return x, y
-    residuals = y - y_hat
-    sigma = float(np.sqrt(np.sum(residuals**2) / (n - 2)))
-    if sigma == 0:
-        return x, y
-    keep = np.abs(residuals) <= (ci_z * sigma)
-    if not np.any(keep):
-        return x, y
-    return x[keep], y[keep]
-
-
-def _stats(arr: np.ndarray) -> dict:
-    if len(arr) == 0:
-        return {
-            "min": None,
-            "mean": None,
-            "median": None,
-            "max": None,
+    events_by_scope: dict[str, dict[str, list[dict]]] = {
+        "global": {"all": global_all, "high_speed_running": global_hsr},
+    }
+    for zone_name in ZONE_NAMES:
+        zone_hsr = tag_events_with_zone(
+            detect_directional_events_in_windows(
+                *common_args, *detect_args, per_zone_high_speed_running_windows.get(zone_name, []),
+            ),
+            x_by_index,
+            forced_zone=zone_name,
+        )
+        events_by_scope[zone_name] = {
+            "all": [event for event in global_all if event.get("pitch_zone") == zone_name],
+            "high_speed_running": zone_hsr,
         }
+    return events_by_scope
+
+
+def _duration_seconds_by_scope(pitch_zone_stats: dict) -> dict[str, dict[str, float]]:
+    def get_seconds(scope: str, zone_key: str) -> float:
+        return float(pitch_zone_stats.get(scope, {}).get(zone_key, {}).get("duration_seconds", 0.0) or 0.0)
+
+    scope_to_pzs_zone = {"global": "full", "left": "left", "middle": "middle", "right": "right"}
     return {
-        "min": float(np.min(arr)),
-        "mean": float(np.mean(arr)),
-        "median": float(np.median(arr)),
-        "max": float(np.max(arr)),
+        scope_key: {sub: get_seconds(sub, zone_key) for sub in ("all", "high_speed_running")}
+        for scope_key, zone_key in scope_to_pzs_zone.items()
     }
 
 
-def _curve_area(times: np.ndarray, values: np.ndarray, absolute: bool = False) -> float:
-    if len(times) < 2 or len(values) < 2:
-        return 0.0
-    integrated_values = np.abs(values) if absolute else values
-    return float(np.trapz(integrated_values, x=times))
-
-
-def _confidence_level_to_z(confidence_level: float) -> float:
-    tail_probability = 0.5 + (float(confidence_level) / 2)
-    return float(NormalDist().inv_cdf(tail_probability))
-
-
-def _build_directional_profile(
-    direction: str,
+def _build_response(
     times: np.ndarray,
     speeds: np.ndarray,
-    accels: np.ndarray,
+    accelerations: np.ndarray,
     absolute_times: list[str] | None,
-    params: AnalyzeParams,
-):
-    if direction == "acceleration":
-        directional_mask = accels > 0
-        raw_accels = accels
-        selection_mode = "top"
-    else:
-        directional_mask = accels < 0
-        raw_accels = accels
-        selection_mode = "bottom"
-
-    base_mask = (speeds >= params.min_speed) & directional_mask
-    filtered_indices = np.where(base_mask)[0]
-
-    selected_indices = _select_points(
-        speeds,
-        raw_accels,
-        filtered_indices,
-        min_speed=params.min_speed,
-        bin_size=params.bin_size,
-        top_n=params.top_n,
-        selection_mode=selection_mode,
-    )
-    if len(selected_indices) < 2:
-        return {
-            "points": [],
-            "fit": None,
-            "meta": {
-                "min_speed": float(params.min_speed),
-                "bin_size": float(params.bin_size),
-                "top_n": int(params.top_n),
-                "confidence_level": float(params.confidence_level),
-            },
-        }
-
-    x = speeds[selected_indices]
-    y = raw_accels[selected_indices]
-
-    intercept, slope = _fit_line(x, y)
-    ci_z = _confidence_level_to_z(params.confidence_level)
-    y_hat = intercept + slope * x
-    residuals = y - y_hat
-    sigma = float(np.sqrt(np.sum(residuals**2) / (len(x) - 2))) if len(x) > 2 else 0.0
-    keep_mask = (
-        np.abs(residuals) <= (ci_z * sigma)
-        if len(x) > 2 and sigma != 0
-        else np.ones(len(x), dtype=bool)
-    )
-    x2, y2 = _apply_ci_filter(x, y, intercept, slope, ci_z)
-    if len(x2) >= 2 and (len(x2) != len(x)):
-        selected_indices = selected_indices[keep_mask]
-        intercept, slope = _fit_line(x2, y2)
-        x, y = x2, y2
-
-    y_hat = intercept + slope * x
-    r2 = _r2(y, y_hat)
-    s0 = float(-intercept / slope) if slope != 0 else float("inf")
-
+    latitudes: list[float | None] | None,
+    longitudes: list[float | None] | None,
+    parameters: AnalyzeParameters,
+    acceleration_profile: Profile,
+    deceleration_profile: Profile,
+    acceleration_events_summary: dict,
+    deceleration_events_summary: dict,
+    pitch_zone_stats: dict,
+    high_speed_running_windows: list[tuple[int, int]],
+) -> dict:
+    acceleration_classification = acceleration_profile.point_classifications
+    deceleration_classification = deceleration_profile.point_classifications
+    n = len(times)
     points = [
         {
-            "index": int(idx),
-            "time": float(times[idx]),
-            "absolute_time": absolute_times[idx]
-            if absolute_times and idx < len(absolute_times)
-            else "",
-            "speed": float(speeds[idx]),
-            "accel": float(raw_accels[idx]),
+            "index": i,
+            "time": float(times[i]),
+            "absolute_time": absolute_times[i] if absolute_times and i < len(absolute_times) else "",
+            "speed": float(speeds[i]),
+            "acceleration": float(accelerations[i]),
+            "acceleration_classification": acceleration_classification[i] if i < len(acceleration_classification) else "excluded",
+            "deceleration_classification": deceleration_classification[i] if i < len(deceleration_classification) else "excluded",
         }
-        for idx in selected_indices.tolist()
+        for i in range(n)
     ]
 
     return {
+        "acceleration_profile": {"fit": acceleration_profile.fit, "meta": acceleration_profile.meta},
+        "deceleration_profile": {"fit": deceleration_profile.fit, "meta": deceleration_profile.meta},
         "points": points,
-        "fit": {
-            "model": "linear",
-            "label": "Linear regression",
-            "A0": float(intercept),
-            "AS_slope": float(slope),
-            "S0": s0,
-            "r2": float(r2),
-            "curve": [
-                {"speed": 0.0, "accel": float(intercept)},
-                {"speed": float(s0), "accel": 0.0},
-            ],
+        "acceleration_events": acceleration_events_summary,
+        "deceleration_events": deceleration_events_summary,
+        "fit": acceleration_profile.fit,
+        "timeseries": {
+            "time": absolute_times if absolute_times and len(absolute_times) == len(times) else [],
+            "relative_time": times.tolist(),
+            "speed": speeds.tolist(),
+            "acceleration": accelerations.tolist(),
+            **({"latitude": latitudes} if latitudes and len(latitudes) == len(times) else {}),
+            **({"longitude": longitudes} if longitudes and len(longitudes) == len(times) else {}),
         },
+        "stats": {
+            "speed": {
+                **stats(speeds),
+                "area": curve_area(times, speeds),
+            },
+            "acceleration": {
+                **stats(accelerations[accelerations > 0]),
+                "area": curve_area(times, np.where(accelerations > 0, accelerations, 0.0)),
+            },
+            "deceleration": {
+                **stats(np.abs(accelerations[accelerations < 0])),
+                "area": curve_area(times, np.where(accelerations < 0, np.abs(accelerations), 0.0)),
+            },
+        },
+        "pitch_zone_stats": pitch_zone_stats,
+        "statistics_rows": build_statistics_rows(pitch_zone_stats),
+        "sample_distributions": summarize_sample_distributions(
+            speeds,
+            accelerations,
+            latitudes,
+            longitudes,
+            float(parameters.min_speed),
+            high_speed_running_windows,
+        ),
         "meta": {
-            "min_speed": float(params.min_speed),
-            "bin_size": float(params.bin_size),
-            "top_n": int(params.top_n),
-            "confidence_level": float(params.confidence_level),
+            "min_speed": float(parameters.min_speed),
+            "deceleration_min_speed": float(parameters.deceleration_min_speed),
+            "bin_size": float(parameters.bin_size),
+            "extreme_n": int(parameters.extreme_n),
+            "confidence_level": float(parameters.confidence_level),
+            "body_mass_kg": float(parameters.body_mass_kg),
+            "minimum_acceleration_for_event_start": float(parameters.minimum_acceleration_for_event_start),
+            "minimum_deceleration_for_event_start": float(parameters.minimum_deceleration_for_event_start),
+            "minimum_event_duration_seconds": float(parameters.minimum_event_duration_seconds),
+            "minimum_high_speed_running_duration_seconds": float(parameters.minimum_high_speed_running_duration_seconds),
+            "minimum_high_speed_running_speed_meters_per_second": float(
+                parameters.minimum_high_speed_running_speed_meters_per_second
+            ),
         },
     }
 
@@ -291,72 +186,73 @@ def _build_directional_profile(
 def build_as_profile(
     times: np.ndarray,
     speeds: np.ndarray,
-    accels: np.ndarray,
+    accelerations: np.ndarray,
     absolute_times: list[str] | None,
     latitudes: list[float | None] | None,
     longitudes: list[float | None] | None,
-    params: AnalyzeParams,
+    parameters: AnalyzeParameters,
 ):
-    acceleration_profile = _build_directional_profile(
-        "acceleration",
-        times,
-        speeds,
-        accels,
-        absolute_times,
-        params,
-    )
-    deceleration_profile = _build_directional_profile(
-        "deceleration",
-        times,
-        speeds,
-        accels,
-        absolute_times,
-        params,
+    minimum_speed = float(parameters.min_speed)
+    body_mass_kg = float(parameters.body_mass_kg)
+    hsr_speed = float(parameters.minimum_high_speed_running_speed_meters_per_second)
+    hsr_duration = float(parameters.minimum_high_speed_running_duration_seconds)
+    event_duration = float(parameters.minimum_event_duration_seconds)
+
+    zone_by_index = build_zone_by_index(latitudes, longitudes, speeds, minimum_speed)
+    x_by_index = build_x_by_index(latitudes, longitudes, speeds, minimum_speed)
+
+    high_speed_running_windows = detect_high_speed_running_windows(times, speeds, hsr_speed, hsr_duration)
+    per_zone_high_speed_running_windows = detect_per_zone_hsr_windows(
+        times, speeds, zone_by_index, hsr_speed, hsr_duration,
     )
 
-    return {
-        "acceleration_profile": acceleration_profile,
-        "deceleration_profile": deceleration_profile,
-        "fit": acceleration_profile["fit"],
-        "points": acceleration_profile["points"],
-        "timeseries": {
-            "time": times.tolist(),
-            "speed": speeds.tolist(),
-            "acceleration": accels.tolist(),
-            **(
-                {"absolute_time": absolute_times}
-                if absolute_times and len(absolute_times) == len(times)
-                else {}
-            ),
-            **(
-                {"latitude": latitudes}
-                if latitudes and len(latitudes) == len(times)
-                else {}
-            ),
-            **(
-                {"longitude": longitudes}
-                if longitudes and len(longitudes) == len(times)
-                else {}
-            ),
-        },
-        "stats": {
-            "speed": {
-                **_stats(speeds),
-                "area": _curve_area(times, speeds),
-            },
-            "acceleration": {
-                **_stats(accels[accels > 0]),
-                "area": _curve_area(times, np.where(accels > 0, accels, 0.0)),
-            },
-            "deceleration": {
-                **_stats(np.abs(accels[accels < 0])),
-                "area": _curve_area(times, np.where(accels < 0, np.abs(accels), 0.0)),
-            },
-        },
-        "meta": {
-            "min_speed": float(params.min_speed),
-            "bin_size": float(params.bin_size),
-            "top_n": int(params.top_n),
-            "confidence_level": float(params.confidence_level),
-        },
-    }
+    acceleration_config = _DirectionConfig(
+        "acceleration", float(parameters.minimum_acceleration_for_event_start), event_duration,
+    )
+    deceleration_config = _DirectionConfig(
+        "deceleration", float(parameters.minimum_deceleration_for_event_start), event_duration,
+    )
+
+    detect_args = (
+        times, speeds, accelerations, absolute_times, latitudes, longitudes,
+        body_mass_kg,
+    )
+    acceleration_events_by_scope = _detect_events_for_direction(
+        *detect_args, acceleration_config, x_by_index,
+        high_speed_running_windows, per_zone_high_speed_running_windows,
+    )
+    deceleration_events_by_scope = _detect_events_for_direction(
+        *detect_args, deceleration_config, x_by_index,
+        high_speed_running_windows, per_zone_high_speed_running_windows,
+    )
+
+    acceleration_profile = build_profile("acceleration", times, speeds, accelerations, parameters)
+    deceleration_profile = build_profile("deceleration", times, speeds, accelerations, parameters)
+
+    pitch_zone_stats = summarize_pitch_zone_stats(
+        times, speeds, accelerations, latitudes, longitudes, minimum_speed,
+        high_speed_running_windows, per_zone_high_speed_running_windows,
+    )
+    duration_seconds_by_scope = _duration_seconds_by_scope(pitch_zone_stats)
+
+    summarize_args = (
+        body_mass_kg,
+        acceleration_config.minimum_value_for_event_start,
+        deceleration_config.minimum_value_for_event_start,
+        event_duration, hsr_duration, hsr_speed,
+    )
+    acceleration_events_summary = summarize_directional_events(
+        "acceleration", acceleration_events_by_scope, deceleration_events_by_scope,
+        duration_seconds_by_scope, *summarize_args,
+    )
+    deceleration_events_summary = summarize_directional_events(
+        "deceleration", deceleration_events_by_scope, acceleration_events_by_scope,
+        duration_seconds_by_scope, *summarize_args,
+    )
+
+    return _build_response(
+        times, speeds, accelerations, absolute_times, latitudes, longitudes, parameters,
+        acceleration_profile, deceleration_profile,
+        acceleration_events_summary, deceleration_events_summary,
+        pitch_zone_stats, high_speed_running_windows,
+    )

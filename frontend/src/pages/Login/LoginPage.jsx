@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import Login from "./Login";
-import { getSession, login } from "../../services/filesApi";
+import { getSession, login } from "../../api/authorizationApi";
+import {
+  fromLoginRequest,
+  toLoginResponse,
+  toSessionResponse,
+} from "../../utils/shared/authorizationMapper";
 
 function resolveRedirectTarget(locationState) {
   const candidate = locationState?.from?.pathname;
@@ -20,7 +25,7 @@ export default function LoginPage() {
 
     async function checkSession() {
       try {
-        const session = await getSession();
+        const session = toSessionResponse(await getSession());
         if (!isActive) {
           return;
         }
@@ -50,7 +55,11 @@ export default function LoginPage() {
     setError("");
 
     try {
-      await login(password);
+      const loginResponse = toLoginResponse(await login(fromLoginRequest(password)));
+      if (!loginResponse.ok) {
+        setError("Login failed.");
+        return false;
+      }
       navigate(resolveRedirectTarget(location.state), { replace: true });
       return true;
     } catch (loginError) {

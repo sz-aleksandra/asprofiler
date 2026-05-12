@@ -1,0 +1,24 @@
+.input {
+  box-sizing: border-box;
+  height: 30px;
+  padding: 6px 8px;
+  border: 1px solid var(--black);
+  border-radius: 6px;
+  align-self: center;
+  background: white;
+  color: var(--black);
+}
+
+.input:disabled {
+  opacity: 0.5;
+}
+
+.sm {
+  min-width: 72px;
+  width: 72px;
+}
+
+.md {
+  min-width: 110px;
+  width: 110px;
+}

@@ -1,27 +1,23 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import Dropzone from "../../components/Dropzone/Dropzone";
-import Toast from "../../components/Toast/Toast";
+import AnalysisParametersForm from "../../components/shared/AnalysisParametersForm/AnalysisParametersForm";
+import Dropzone from "../../components/fileslist/Dropzone/Dropzone";
+import FilesSelectionTable from "../../components/fileslist/FilesSelectionTable/FilesSelectionTable";
+import Toast from "../../ui/Toast/Toast";
 
-import { analyzeFiles } from "../../services/filesApi";
-import { formatBytes } from "../../utils/formatBytes";
-import { getCssVar } from "../../utils/getCssVar";
-import { normalizeGpsCsvFile } from "../../utils/normalizeGpsCsv";
+import { analyzeFiles } from "../../api/filesApi";
+import useLocalStorage from "../../hooks/shared/useLocalStorage";
+import { fromAnalysisRequest, toAnalysisResponse } from "../../utils/fileslist/filesMapper";
+import { getCssVar } from "../../utils/shared/getCssVar";
+import { normalizeGpsCsvFile } from "../../utils/fileslist/normalizeGpsCsv";
+import {
+  DEFAULT_ANALYSIS_PARAMS,
+  DEFAULT_PREPROCESSING,
+} from "../../utils/shared/analysisConstants";
+import { buildAnalysisColorMap } from "../../utils/shared/analysisRows";
 
 import styles from "./FilesList.module.css";
-
-const DEFAULT_PARAMS = {
-  min_speed: 3,
-  bin_size: 0.2,
-  top_n: 2,
-  confidence_level: 0.95,
-};
-const DEFAULT_PREPROCESSING = {
-  filter_window: 5,
-  filter_mode: "median_mean",
-  hacc_threshold: 2,
-};
 
 export default function FilesList() {
   const navigate = useNavigate();
@@ -29,46 +25,47 @@ export default function FilesList() {
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState({ message: "", type: "info" });
-  const [params, setParams] = useState(() => {
-    try {
-      const raw = localStorage.getItem("analysis_params");
-      if (raw) return { ...DEFAULT_PARAMS, ...JSON.parse(raw) };
-    } catch {
-      // ignore
-    }
-    return DEFAULT_PARAMS;
-  });
-  const [defaultColor, setDefaultColor] = useState(() => {
-    const raw = localStorage.getItem("analysis_default_color");
-    return raw || getCssVar("--red");
-  });
-  const [colorsMap, setColorsMap] = useState(() => {
-    try {
-      const raw = localStorage.getItem("analysis_colors_map");
-      if (!raw) return {};
-      return JSON.parse(raw);
-    } catch {
-      return {};
-    }
-  });
-  const [paramsMap, setParamsMap] = useState(() => {
-    try {
-      const raw = localStorage.getItem("analysis_params_map");
-      if (!raw) return {};
-      return JSON.parse(raw);
-    } catch {
-      return {};
-    }
-  });
-  const [preprocessing, setPreprocessing] = useState(() => {
-    try {
-      const raw = localStorage.getItem("analysis_preprocessing");
-      if (raw) return { ...DEFAULT_PREPROCESSING, ...JSON.parse(raw) };
-    } catch {
-      // ignore
-    }
-    return DEFAULT_PREPROCESSING;
-  });
+
+  const [storedParameters, setStoredParameters] = useLocalStorage(
+    "analysis_params",
+    DEFAULT_ANALYSIS_PARAMS,
+  );
+  const parameters = useMemo(
+    () => ({ ...DEFAULT_ANALYSIS_PARAMS, ...storedParameters }),
+    [storedParameters],
+  );
+  const [defaultColor, setDefaultColor] = useLocalStorage(
+    "analysis_default_color",
+    getCssVar("--red"),
+  );
+  const [colorsMap, setColorsMap] = useLocalStorage("analysis_colors_map", {});
+  const [storedParametersByFile, setStoredParametersByFile] = useLocalStorage(
+    "analysis_params_map",
+    {},
+  );
+  const parametersByFile = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(storedParametersByFile).map(([fileName, fileParameters]) => [
+          fileName,
+          { ...DEFAULT_ANALYSIS_PARAMS, ...fileParameters },
+        ]),
+      ),
+    [storedParametersByFile],
+  );
+  const [storedPreprocessing, setPreprocessingParameters] = useLocalStorage(
+    "analysis_preprocessing",
+    DEFAULT_PREPROCESSING,
+  );
+  const preprocessingParameters = useMemo(
+    () => ({ ...DEFAULT_PREPROCESSING, ...storedPreprocessing }),
+    [storedPreprocessing],
+  );
+  const [profilingSpeedUnit, setProfilingSpeedUnit] = useLocalStorage(
+    "analysis_profiling_speed_unit",
+    "m/s",
+  );
+  const [eventSpeedUnit, setEventSpeedUnit] = useLocalStorage("analysis_event_speed_unit", "km/h");
 
   const closeToast = () => setToast({ message: "", type: "info" });
 
@@ -111,23 +108,20 @@ export default function FilesList() {
     setSelected(new Set());
   };
 
-  const persistAnalysisSettings = () => {
-    localStorage.setItem("analysis_params", JSON.stringify(params));
-    localStorage.setItem("analysis_params_map", JSON.stringify(paramsMap));
-    localStorage.setItem("analysis_colors_map", JSON.stringify(colorsMap));
-    localStorage.setItem("analysis_default_color", defaultColor);
-    localStorage.setItem("analysis_preprocessing", JSON.stringify(preprocessing));
+  const updateGlobalParam = (key, value) => {
+    setStoredParameters((prev) => ({ ...prev, [key]: value }));
+    setStoredParametersByFile((prev) =>
+      Object.fromEntries(
+        Object.entries(prev).map(([name, fileParameters]) => [
+          name,
+          { ...fileParameters, [key]: value },
+        ]),
+      ),
+    );
   };
 
-  const updateGlobalParam = (key, value) => {
-    setParams((prev) => ({ ...prev, [key]: value }));
-    setParamsMap((prev) => {
-      const next = Object.fromEntries(
-        Object.entries(prev).map(([name, fileParams]) => [name, { ...fileParams, [key]: value }]),
-      );
-      localStorage.setItem("analysis_params_map", JSON.stringify(next));
-      return next;
-    });
+  const updatePreprocessingParameter = (key, value) => {
+    setPreprocessingParameters((prev) => ({ ...prev, [key]: value }));
   };
 
   const analyze = async (names) => {
@@ -141,9 +135,11 @@ export default function FilesList() {
         filesToAnalyze.map(async (file) => {
           try {
             const normalized = await normalizeGpsCsvFile(file, {
-              filterWindow: preprocessing.filter_window,
-              filterMode: preprocessing.filter_mode,
-              haccThreshold: preprocessing.hacc_threshold,
+              maximumHorizontalAccuracyMeters:
+                preprocessingParameters.maximum_horizontal_accuracy_meters,
+              maximumHorizontalDilutionOfPrecision:
+                preprocessingParameters.maximum_horizontal_dilution_of_precision,
+              minimumSatellites: preprocessingParameters.minimum_satellites,
             });
             return { name: file.name, file: normalized };
           } catch (error) {
@@ -161,24 +157,24 @@ export default function FilesList() {
         );
       }
 
-      const res = await analyzeFiles(readyFiles, params, paramsMap);
-      const okResults = Array.isArray(res?.results)
-        ? res.results.filter((item) => item?.profile)
-        : [];
-      const failedResults = [
-        ...failedPreprocessing.map((item) => ({ name: item.name, error: item.error })),
-        ...(Array.isArray(res?.results) ? res.results.filter((item) => item?.error) : []),
-      ];
+      const requestBody = fromAnalysisRequest(
+        readyFiles,
+        parameters,
+        parametersByFile,
+        preprocessingParameters,
+      );
+      const analysisResponse = await analyzeFiles(requestBody);
+      const { successfulResults, failedResults } = toAnalysisResponse(
+        analysisResponse,
+        failedPreprocessing,
+      );
 
-      if (okResults.length) {
-        persistAnalysisSettings();
+      if (successfulResults.length) {
         navigate("/analysis", {
           state: {
-            results: okResults,
-            color_map: Object.fromEntries(
-              okResults.map((item) => [item.name, colorsMap[item.name] || defaultColor]),
-            ),
-            preprocessing,
+            results: successfulResults,
+            color_map: buildAnalysisColorMap(successfulResults, colorsMap, defaultColor),
+            preprocessing_parameters: preprocessingParameters,
           },
         });
       }
@@ -187,13 +183,13 @@ export default function FilesList() {
         ? ` Failed: ${failedResults.map((item) => `${item.name} (${item.error})`).join(", ")}`
         : "";
       setToast({
-        message: `Analyzed ${okResults.length}/${names.length} file(s): ${names
+        message: `Analyzed ${successfulResults.length}/${names.length} file(s): ${names
           .slice(0, 3)
           .join(", ")}${names.length > 3 ? "…" : ""}.${failedMessage}`,
-        type: okResults.length ? "success" : "error",
+        type: successfulResults.length ? "success" : "error",
       });
-    } catch (e) {
-      setToast({ message: String(e.message || e), type: "error" });
+    } catch (error) {
+      setToast({ message: String(error.message || error), type: "error" });
     } finally {
       setBusy(false);
     }
@@ -212,322 +208,41 @@ export default function FilesList() {
 
       <Dropzone onFiles={onFiles} />
 
-      <div className={styles.controls}>
-        <div className={`${styles.sectionTitle} ${styles.parameterSectionTitle}`}>Filtering parameters</div>
-        <div className={styles.selectionControls}>
-          <label className={styles.selectionLabel}>
-            Filter type
-            <select
-              className={styles.selectionSelect}
-              value={preprocessing.filter_mode}
-              onChange={(e) => {
-                const next = { ...preprocessing, filter_mode: e.target.value };
-                setPreprocessing(next);
-                localStorage.setItem("analysis_preprocessing", JSON.stringify(next));
-              }}
-              disabled={busy}
-            >
-              <option value="none">None</option>
-              <option value="median">Median</option>
-              <option value="mean">Mean</option>
-              <option value="median_mean">Median → Mean</option>
-            </select>
-          </label>
-          <label className={styles.selectionLabel}>
-            Filter window
-            <input
-              className={styles.selectionInput}
-              type="number"
-              min="1"
-              step="1"
-              value={preprocessing.filter_window}
-              onChange={(e) => {
-                const next = {
-                  ...preprocessing,
-                  filter_window: Math.max(1, Math.floor(Number(e.target.value) || 1)),
-                };
-                setPreprocessing(next);
-                localStorage.setItem("analysis_preprocessing", JSON.stringify(next));
-              }}
-              disabled={busy || preprocessing.filter_mode === "none"}
-            />
-          </label>
-          <label className={styles.selectionLabel}>
-            <span className={styles.statsHeadWithHelp}>
-              <span>Hacc threshold (m)</span>
-              <span className={styles.helpIcon} tabIndex={0}>
-                ?
-                <span className={styles.helpTooltip}>
-                  <span>Horizontal accuracy = estimated horizontal position error in meters.</span>
-                </span>
-              </span>
-            </span>
-            <input
-              className={styles.selectionInput}
-              type="number"
-              min="0"
-              step="0.1"
-              value={preprocessing.hacc_threshold}
-              onChange={(e) => {
-                const next = {
-                  ...preprocessing,
-                  hacc_threshold: Math.max(0, Number(e.target.value) || 0),
-                };
-                setPreprocessing(next);
-                localStorage.setItem("analysis_preprocessing", JSON.stringify(next));
-              }}
-              disabled={busy}
-            />
-          </label>
-        </div>
-      </div>
+      <AnalysisParametersForm
+        analysisParameters={parameters}
+        preprocessingParameters={preprocessingParameters}
+        profilingSpeedUnit={profilingSpeedUnit}
+        onProfilingSpeedUnitChange={setProfilingSpeedUnit}
+        eventSpeedUnit={eventSpeedUnit}
+        onEventSpeedUnitChange={setEventSpeedUnit}
+        onAnalysisParameterChange={updateGlobalParam}
+        onPreprocessingParameterChange={updatePreprocessingParameter}
+        defaultColor={defaultColor}
+        onDefaultColorChange={setDefaultColor}
+        showDefaultColor
+        disabled={busy}
+      />
 
-      <div className={styles.controls}>
-        <div className={`${styles.sectionTitle} ${styles.parameterSectionTitle}`}>Analysis preset</div>
-        <div className={styles.selectionControls}>
-          <label className={styles.selectionLabel}>
-            Min speed (m/s)
-            <input
-              className={styles.selectionInput}
-              type="number"
-              step="0.1"
-              value={params.min_speed}
-              onChange={(e) => updateGlobalParam("min_speed", Number(e.target.value))}
-              disabled={busy}
-            />
-          </label>
-          <label className={styles.selectionLabel}>
-            Bin size (m/s)
-            <input
-              className={styles.selectionInput}
-              type="number"
-              step="0.1"
-              value={params.bin_size}
-              onChange={(e) => updateGlobalParam("bin_size", Number(e.target.value))}
-              disabled={busy}
-            />
-          </label>
-          <label className={styles.selectionLabel}>
-            Top points per bin
-            <input
-              className={styles.selectionInput}
-              type="number"
-              min="1"
-              step="1"
-              value={params.top_n}
-              onChange={(e) => updateGlobalParam("top_n", Math.max(1, Math.floor(Number(e.target.value) || 1)))}
-              disabled={busy}
-            />
-          </label>
-          <label className={styles.selectionLabel}>
-            Confidence level
-            <input
-              className={styles.selectionInput}
-              type="number"
-              step="0.01"
-              min="0.01"
-              max="0.999"
-              value={params.confidence_level}
-              onChange={(e) => updateGlobalParam("confidence_level", Number(e.target.value))}
-              disabled={busy}
-            />
-          </label>
-          <label className={styles.selectionLabel}>
-            Default color
-            <input
-              className={styles.colorInput}
-              type="color"
-              value={defaultColor}
-              onChange={(e) => {
-                setDefaultColor(e.target.value);
-                localStorage.setItem("analysis_default_color", e.target.value);
-              }}
-              disabled={busy}
-            />
-          </label>
-        </div>
-      </div>
-
-      <div className={styles.inlineTable}>
-        <div className={styles.toolbar}>
-          <div className={styles.toolbarLeft}>
-            <label className={styles.selectAll}>
-              <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={() => onToggleAll(!allSelected)}
-                disabled={!pendingFiles.length || busy}
-              />
-              <span>Select all</span>
-            </label>
-            <span className={styles.count}>
-              {pendingFiles.length} files · {selected.size} selected
-            </span>
-          </div>
-          <div className={styles.actionsGroup}>
-            <button
-              className={styles.primaryBtn}
-              onClick={() => analyze([...selected])}
-              disabled={!selected.size || busy}
-              type="button"
-            >
-              Analyze selected
-            </button>
-            <button
-              className={styles.dangerBtn}
-              onClick={onRemoveSelected}
-              disabled={!selected.size || busy}
-              type="button"
-            >
-              Remove selected
-            </button>
-          </div>
-        </div>
-        <div className={`${styles.row} ${styles.head}`}>
-          <div className={styles.cellCheckbox}></div>
-          <div className={styles.cellName}>Filename</div>
-          <div className={styles.cellSize}>Size</div>
-          <div className={styles.cellActions}></div>
-        </div>
-        {sortedFiles.map((file) => {
-          const checked = selected.has(file.name);
-          const perParams = { ...params, ...(paramsMap[file.name] || {}) };
-          return (
-            <div key={file.name} className={styles.fileBlock}>
-              <div className={`${styles.row} ${checked ? styles.rowExpanded : ""}`}>
-                <div className={styles.cellCheckbox}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => onToggleOne(file.name)}
-                    disabled={busy}
-                  />
-                </div>
-                <div className={styles.cellName}>{file.name}</div>
-                <div className={styles.cellSize}>{formatBytes(file.size)}</div>
-                <div className={styles.cellActions}>
-                  <button
-                    className={styles.linkPrimary}
-                    onClick={() => analyze([file.name])}
-                    disabled={busy}
-                    type="button"
-                  >
-                    Analyze
-                  </button>
-                  <button
-                    className={styles.linkDanger}
-                    onClick={() => onRemoveOne(file.name)}
-                    disabled={busy}
-                    type="button"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-              {checked && (
-                <div className={styles.inlinePanel}>
-                  <label className={styles.selectionLabel}>
-                    Color
-                    <input
-                      className={styles.colorInput}
-                      type="color"
-                      value={colorsMap[file.name] || defaultColor}
-                      onChange={(e) => {
-                        const next = { ...colorsMap, [file.name]: e.target.value };
-                        setColorsMap(next);
-                        localStorage.setItem("analysis_colors_map", JSON.stringify(next));
-                      }}
-                      disabled={busy}
-                    />
-                  </label>
-                  <label className={styles.selectionLabel}>
-                    Min speed (m/s)
-                    <input
-                      className={styles.selectionInput}
-                      type="number"
-                      step="0.1"
-                      value={perParams.min_speed}
-                      onChange={(e) => {
-                        const next = {
-                          ...paramsMap,
-                          [file.name]: { ...perParams, min_speed: Number(e.target.value) },
-                        };
-                        setParamsMap(next);
-                        localStorage.setItem("analysis_params_map", JSON.stringify(next));
-                      }}
-                      disabled={busy}
-                    />
-                  </label>
-                  <label className={styles.selectionLabel}>
-                    Bin size (m/s)
-                    <input
-                      className={styles.selectionInput}
-                      type="number"
-                      step="0.1"
-                      value={perParams.bin_size}
-                      onChange={(e) => {
-                        const next = {
-                          ...paramsMap,
-                          [file.name]: { ...perParams, bin_size: Number(e.target.value) },
-                        };
-                        setParamsMap(next);
-                        localStorage.setItem("analysis_params_map", JSON.stringify(next));
-                      }}
-                      disabled={busy}
-                    />
-                  </label>
-                  <label className={styles.selectionLabel}>
-                    Top points per bin
-                    <input
-                      className={styles.selectionInput}
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={perParams.top_n}
-                      onChange={(e) => {
-                        const next = {
-                          ...paramsMap,
-                          [file.name]: {
-                            ...perParams,
-                            top_n: Math.max(1, Math.floor(Number(e.target.value) || 1)),
-                          },
-                        };
-                        setParamsMap(next);
-                        localStorage.setItem("analysis_params_map", JSON.stringify(next));
-                      }}
-                      disabled={busy}
-                    />
-                  </label>
-                  <label className={styles.selectionLabel}>
-                    Confidence level
-                    <input
-                      className={styles.selectionInput}
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      max="0.999999"
-                      value={perParams.confidence_level}
-                      onChange={(e) => {
-                        const next = {
-                          ...paramsMap,
-                          [file.name]: {
-                            ...perParams,
-                            confidence_level: Number(e.target.value),
-                          },
-                        };
-                        setParamsMap(next);
-                        localStorage.setItem("analysis_params_map", JSON.stringify(next));
-                      }}
-                      disabled={busy}
-                    />
-                  </label>
-                </div>
-              )}
-            </div>
-          );
-        })}
-        {!sortedFiles.length && <div className={styles.emptyRow}>No files selected yet.</div>}
-      </div>
+      <FilesSelectionTable
+        pendingFiles={pendingFiles}
+        selected={selected}
+        busy={busy}
+        allSelected={allSelected}
+        sortedFiles={sortedFiles}
+        analyze={analyze}
+        onToggleAll={onToggleAll}
+        onToggleOne={onToggleOne}
+        onRemoveOne={onRemoveOne}
+        onRemoveSelected={onRemoveSelected}
+        parameters={parameters}
+        parametersByFile={parametersByFile}
+        defaultColor={defaultColor}
+        colorsMap={colorsMap}
+        setColorsMap={setColorsMap}
+        profilingSpeedUnit={profilingSpeedUnit}
+        onProfilingSpeedUnitChange={setProfilingSpeedUnit}
+        setParametersByFile={setStoredParametersByFile}
+      />
 
       <Toast message={toast.message} type={toast.type} onClose={closeToast} />
     </section>

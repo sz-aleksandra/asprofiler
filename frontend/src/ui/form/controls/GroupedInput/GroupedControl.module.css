@@ -1,0 +1,33 @@
+.group {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.input,
+.select {
+  box-sizing: border-box;
+  height: 30px;
+  border: 1px solid var(--black);
+  background: white;
+  color: var(--black);
+  align-self: center;
+}
+
+.input {
+  min-width: 73px;
+  width: 73px;
+  padding: 6px 8px;
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+}
+
+.select {
+  min-width: 73px;
+  padding: 6px 8px;
+  border-radius: 0 6px 6px 0;
+}
+
+.input:disabled,
+.select:disabled {
+  opacity: 0.5;
+}

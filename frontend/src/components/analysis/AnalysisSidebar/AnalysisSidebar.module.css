@@ -1,0 +1,21 @@
+.controls {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 14px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+.sectionTitle {
+  padding: 12px 14px;
+  font-weight: 600;
+  color: var(--white);
+}
