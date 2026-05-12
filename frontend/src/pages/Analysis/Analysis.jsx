@@ -439,6 +439,7 @@ export default function Analysis() {
                 (eventPhaseMode === "early_late" ? (
                   <AnalysisDataTable
                     title="Acceleration event early/late phase statistics"
+                    titleTooltipLines={["Split point = 50% v exit."]}
                     columns={buildEarlyLateEventColumns("acceleration")}
                     rows={accelerationEventRows}
                     getRowKey={(row) => `${row.fileName}-acceleration-event-earlylate-${row.bin}`}
@@ -459,6 +460,7 @@ export default function Analysis() {
                 (eventPhaseMode === "early_late" ? (
                   <AnalysisDataTable
                     title="Deceleration event early/late phase statistics"
+                    titleTooltipLines={["Split point = 50% v entry."]}
                     columns={buildEarlyLateEventColumns("deceleration")}
                     rows={decelerationEventRows}
                     getRowKey={(row) => `${row.fileName}-deceleration-event-earlylate-${row.bin}`}

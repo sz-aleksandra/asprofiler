@@ -2,6 +2,7 @@ import styles from "./AnalysisDataTable.module.css";
 
 export default function AnalysisDataTable({
   title,
+  titleTooltipLines,
   columns,
   rows,
   getRowKey,
@@ -12,7 +13,19 @@ export default function AnalysisDataTable({
     <div className={styles.card}>
       <div className={styles.toolbar}>
         <div className={styles.toolbarLeft}>
-          <div className={styles.sectionTitle}>{title}</div>
+          <div className={styles.sectionTitleWrap}>
+            <div className={styles.sectionTitle}>{title}</div>
+            {Array.isArray(titleTooltipLines) && titleTooltipLines.length > 0 ? (
+              <span className={styles.helpIcon} tabIndex={0}>
+                ?
+                <span className={styles.helpTooltip}>
+                  {titleTooltipLines.map((line) => (
+                    <span key={line}>{line}</span>
+                  ))}
+                </span>
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
       <div className={`${styles.row} ${styles.head}`} style={{ gridTemplateColumns }}>
