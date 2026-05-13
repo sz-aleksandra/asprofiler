@@ -112,6 +112,7 @@ def _summarize_scope(
 
     return {
         "duration_seconds": duration_seconds,
+        "events": events,
         "summary": summary,
         "bins": bins,
     }
