@@ -11,6 +11,22 @@ function fmt(value) {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
 }
 
+function getAbsoluteNumericValue(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return value;
+  return Math.abs(Number(value));
+}
+
+function getEarlyLateExportValues(formatValue, earlyValue, lateValue) {
+  const absEarly = getAbsoluteNumericValue(earlyValue);
+  const absLate = getAbsoluteNumericValue(lateValue);
+  const ratioText =
+    typeof absEarly === "number" && typeof absLate === "number" && absLate !== 0
+      ? (absEarly / absLate).toFixed(2)
+      : "-";
+
+  return [formatValue(absEarly), formatValue(absLate), ratioText];
+}
+
 export function formatEventBinLabel(label, eventBinMode, isForceProfile = false) {
   const m = isForceProfile ? BASELINE_BODY_MASS_KG : 1;
   const classicLabels = {
@@ -34,6 +50,7 @@ export function formatEventBinLabel(label, eventBinMode, isForceProfile = false)
 export function buildStatsColumns({
   styles,
   renderSpeedStatValue,
+  formatSpeedWithKmh,
   fmtWithUnit,
   formatGpsDuration,
   renderInfoHeader,
@@ -44,54 +61,79 @@ export function buildStatsColumns({
     {
       key: "metric",
       header: "",
+      exportHeader: "Metric",
       cellClassName: styles.statsLabel,
       renderCell: (row) => `${row.fileName} ${row.metricLabel}`,
+      exportValue: (row) => `${row.fileName} ${row.metricLabel}`,
     },
     {
       key: "min",
       header: "Min",
+      exportHeader: "Min",
       cellClassName: styles.statsValue,
       renderCell: (row) =>
         row.metric === "speed"
           ? renderSpeedStatValue(row.values?.min)
           : fmtWithUnit(row.values?.min, row.units.value),
+      exportValue: (row) =>
+        row.metric === "speed"
+          ? formatSpeedWithKmh(row.values?.min)
+          : fmtWithUnit(row.values?.min, row.units.value),
     },
     {
       key: "mean",
       header: "Mean",
+      exportHeader: "Mean",
       cellClassName: styles.statsValue,
       renderCell: (row) =>
         row.metric === "speed"
           ? renderSpeedStatValue(row.values?.mean)
           : fmtWithUnit(row.values?.mean, row.units.value),
+      exportValue: (row) =>
+        row.metric === "speed"
+          ? formatSpeedWithKmh(row.values?.mean)
+          : fmtWithUnit(row.values?.mean, row.units.value),
     },
     {
       key: "median",
       header: "Median",
+      exportHeader: "Median",
       cellClassName: styles.statsValue,
       renderCell: (row) =>
         row.metric === "speed"
           ? renderSpeedStatValue(row.values?.median)
           : fmtWithUnit(row.values?.median, row.units.value),
+      exportValue: (row) =>
+        row.metric === "speed"
+          ? formatSpeedWithKmh(row.values?.median)
+          : fmtWithUnit(row.values?.median, row.units.value),
     },
     {
       key: "max",
       header: "Max",
+      exportHeader: "Max",
       cellClassName: styles.statsValue,
       renderCell: (row) =>
         row.metric === "speed"
           ? renderSpeedStatValue(row.values?.max)
           : fmtWithUnit(row.values?.max, row.units.value),
+      exportValue: (row) =>
+        row.metric === "speed"
+          ? formatSpeedWithKmh(row.values?.max)
+          : fmtWithUnit(row.values?.max, row.units.value),
     },
     {
       key: "duration",
+      exportHeader: "Duration",
       renderHeader: () => renderInfoHeader("Duration", ["HH:MM:SS.s"]),
       cellClassName: styles.statsValue,
       renderCell: (row) => formatGpsDuration(row.duration),
+      exportValue: (row) => formatGpsDuration(row.duration),
     },
     {
       key: "area",
       cellClassName: styles.statsValue,
+      exportHeader: "Area",
       renderHeader: () =>
         renderInfoHeader("Area", [
           "Speed area = total distance.",
@@ -100,6 +142,12 @@ export function buildStatsColumns({
             : "Acceleration area = accumulated speed change.",
         ]),
       renderCell: (row) =>
+        row.metric === "speed"
+          ? formatDistanceKm(row.values?.area)
+          : row.units.area
+            ? fmtWithUnit(row.values?.area, row.units.area)
+            : "-",
+      exportValue: (row) =>
         row.metric === "speed"
           ? formatDistanceKm(row.values?.area)
           : row.units.area
@@ -129,29 +177,38 @@ export function buildEventColumns({
     {
       key: "fileName",
       header: "Filename",
+      exportHeader: "Filename",
       cellClassName: styles.statsLabel,
       renderCell: (row) => row.fileName,
+      exportValue: (row) => row.fileName,
     },
     {
       key: "bin",
       header: `Bin (${isForceProfile ? "N" : "m/s²"})`,
+      exportHeader: `Bin (${isForceProfile ? "N" : "m/s²"})`,
       cellClassName: styles.statsValue,
       renderCell: (row) => formatLabel(row.bin),
+      exportValue: (row) => formatLabel(row.bin),
     },
     {
       key: "count",
       header: "Count",
+      exportHeader: "Count",
       cellClassName: styles.statsValue,
       renderCell: (row) => fmtCount(row.values?.count),
+      exportValue: (row) => fmtCount(row.values?.count),
     },
     {
       key: "density",
       header: "Density",
+      exportHeader: "Density",
       cellClassName: styles.statsValue,
       renderCell: (row) => `${formatNumber(row.values?.density_per_minute)}/min`,
+      exportValue: (row) => `${formatNumber(row.values?.density_per_minute)}/min`,
     },
     {
       key: "ratio",
+      exportHeader: ratioLabel,
       cellClassName: styles.statsValue,
       renderHeader: () =>
         renderInfoHeader(
@@ -161,33 +218,45 @@ export function buildEventColumns({
             : ["acceleration count / deceleration count."],
         ),
       renderCell: (row) => formatNumber(row.values?.ratio_to_opposite),
+      exportValue: (row) => formatNumber(row.values?.ratio_to_opposite),
     },
     {
       key: "duration",
       header: "Mean duration",
+      exportHeader: "Mean duration",
       cellClassName: styles.statsValue,
       renderCell: (row) => formatSecondsValue(row.values?.mean_duration),
+      exportValue: (row) => formatSecondsValue(row.values?.mean_duration),
     },
     {
       key: "distance",
       header: "Mean distance",
+      exportHeader: "Mean distance",
       cellClassName: styles.statsValue,
       renderCell: (row) => fmtWithUnit(row.values?.mean_distance, "m"),
+      exportValue: (row) => fmtWithUnit(row.values?.mean_distance, "m"),
     },
     {
       key: "entrySpeed",
       header: "Mean v entry",
+      exportHeader: "Mean v entry",
       cellClassName: styles.statsValue,
       renderCell: (row) => renderSpeedWithKmh(row.values?.mean_entry_speed),
+      exportValue: (row) => renderSpeedWithKmh(row.values?.mean_entry_speed),
     },
     {
       key: "exitSpeed",
       header: "Mean v exit",
+      exportHeader: "Mean v exit",
       cellClassName: styles.statsValue,
       renderCell: (row) => renderSpeedWithKmh(row.values?.mean_exit_speed),
+      exportValue: (row) => renderSpeedWithKmh(row.values?.mean_exit_speed),
     },
     {
       key: "average",
+      exportHeader: isForceProfile
+        ? `Mean ${direction === "deceleration" ? "deceleration" : "acceleration"} force`
+        : `Mean ${direction === "deceleration" ? "deceleration" : "acceleration"}`,
       header: isForceProfile
         ? `Mean ${direction === "deceleration" ? "deceleration" : "acceleration"} force`
         : `Mean ${direction === "deceleration" ? "deceleration" : "acceleration"}`,
@@ -199,10 +268,18 @@ export function buildEventColumns({
           : row.values?.mean_average_acceleration_magnitude;
         return fmtWithUnit(averageValue, isForceProfile ? "N" : "m/s²");
       },
+      exportValue: (row) => {
+        const bodyMassKg = getEventBodyMassKg(row.fileName, direction);
+        const averageValue = isForceProfile
+          ? Number(row.values?.mean_average_acceleration_magnitude) * bodyMassKg
+          : row.values?.mean_average_acceleration_magnitude;
+        return fmtWithUnit(averageValue, isForceProfile ? "N" : "m/s²");
+      },
     },
     {
       key: "powerPerKg",
       cellClassName: styles.statsValue,
+      exportHeader: `Mean ${isForceProfile ? "" : "relative "}${horizontalPowerLabel}`,
       renderHeader: () =>
         renderInfoHeader(
           `Mean ${isForceProfile ? "" : "relative "}${horizontalPowerLabel}`,
@@ -220,10 +297,17 @@ export function buildEventColumns({
         const scaled = isForceProfile && value != null ? Number(value) * bodyMassKg : value;
         return fmtWithUnit(scaled, isForceProfile ? "W" : "W/kg");
       },
+      exportValue: (row) => {
+        const bodyMassKg = getEventBodyMassKg(row.fileName, direction);
+        const value = row.values?.mean_horizontal_power_per_kilogram;
+        const scaled = isForceProfile && value != null ? Number(value) * bodyMassKg : value;
+        return fmtWithUnit(scaled, isForceProfile ? "W" : "W/kg");
+      },
     },
     {
       key: "impulse",
       cellClassName: styles.statsValue,
+      exportHeader: `Mean ${impulseLabel}`,
       renderHeader: () =>
         renderInfoHeader(
           `Mean ${impulseLabel}`,
@@ -242,28 +326,30 @@ export function buildEventColumns({
             : Math.abs(Number(row.values?.mean_horizontal_braking_impulse));
         return fmtWithUnit(impulseValue, "N·s");
       },
+      exportValue: (row) => {
+        const impulseValue =
+          row.values?.mean_horizontal_braking_impulse === undefined ||
+          row.values?.mean_horizontal_braking_impulse === null ||
+          Number.isNaN(row.values?.mean_horizontal_braking_impulse)
+            ? row.values?.mean_horizontal_braking_impulse
+            : Math.abs(Number(row.values?.mean_horizontal_braking_impulse));
+        return fmtWithUnit(impulseValue, "N·s");
+      },
     },
   ];
 }
 
 function renderEarlyLateCell(styles, formatValue, earlyValue, lateValue) {
-  const absEarly =
-    earlyValue === null || earlyValue === undefined || Number.isNaN(Number(earlyValue))
-      ? earlyValue
-      : Math.abs(Number(earlyValue));
-  const absLate =
-    lateValue === null || lateValue === undefined || Number.isNaN(Number(lateValue))
-      ? lateValue
-      : Math.abs(Number(lateValue));
-  const ratioText =
-    typeof absEarly === "number" && typeof absLate === "number" && absLate !== 0
-      ? (absEarly / absLate).toFixed(2)
-      : "-";
+  const [earlyText, lateText, ratioText] = getEarlyLateExportValues(
+    formatValue,
+    earlyValue,
+    lateValue,
+  );
   return createElement(
     "div",
     { className: styles.earlyLateCell },
-    createElement("div", { className: styles.earlyValue }, formatValue(absEarly)),
-    createElement("div", { className: styles.lateValue }, formatValue(absLate)),
+    createElement("div", { className: styles.earlyValue }, earlyText),
+    createElement("div", { className: styles.lateValue }, lateText),
     createElement("div", { className: styles.ratioValue }, ratioText),
   );
 }
@@ -290,12 +376,15 @@ export function buildEarlyLateEventColumns({
     {
       key: "fileName",
       header: "Filename",
+      exportHeader: "Filename",
       cellClassName: styles.statsLabel,
       renderCell: (row) => row.fileName,
+      exportValue: (row) => row.fileName,
     },
     {
       key: "bin",
       header: `Bin (${isForceProfile ? "N" : "m/s²"})`,
+      exportHeader: `Bin (${isForceProfile ? "N" : "m/s²"})`,
       cellClassName: styles.statsValue,
       renderCell: (row) => {
         const label = formatLabel(row.bin);
@@ -307,10 +396,12 @@ export function buildEarlyLateEventColumns({
           createElement("div", { className: styles.ratioValue }, `${label} early/late`),
         );
       },
+      exportValue: (row) => formatLabel(row.bin),
     },
     {
       key: "duration",
       header: "Mean duration",
+      exportHeader: "Mean duration",
       cellClassName: styles.statsValue,
       renderCell: (row) =>
         renderEarlyLateCell(
@@ -319,10 +410,17 @@ export function buildEarlyLateEventColumns({
           row.values?.mean_first_phase_duration,
           row.values?.mean_second_phase_duration,
         ),
+      exportTripletValue: (row) =>
+        getEarlyLateExportValues(
+          formatSecondsValue,
+          row.values?.mean_first_phase_duration,
+          row.values?.mean_second_phase_duration,
+        ),
     },
     {
       key: "distance",
       header: "Mean distance",
+      exportHeader: "Mean distance",
       cellClassName: styles.statsValue,
       renderCell: (row) =>
         renderEarlyLateCell(
@@ -331,9 +429,16 @@ export function buildEarlyLateEventColumns({
           row.values?.mean_first_phase_distance,
           row.values?.mean_second_phase_distance,
         ),
+      exportTripletValue: (row) =>
+        getEarlyLateExportValues(
+          (v) => fmtWithUnit(v, "m"),
+          row.values?.mean_first_phase_distance,
+          row.values?.mean_second_phase_distance,
+        ),
     },
     {
       key: "accelAvg",
+      exportHeader: `Mean ${direction === "deceleration" ? "deceleration" : "acceleration"}${isForceProfile ? " force" : ""} average`,
       header: `Mean ${direction === "deceleration" ? "deceleration" : "acceleration"}${isForceProfile ? " force" : ""} average`,
       cellClassName: styles.statsValue,
       renderCell: (row) =>
@@ -343,9 +448,16 @@ export function buildEarlyLateEventColumns({
           scaleByMass(row.fileName, row.values?.mean_first_phase_mean_magnitude),
           scaleByMass(row.fileName, row.values?.mean_second_phase_mean_magnitude),
         ),
+      exportTripletValue: (row) =>
+        getEarlyLateExportValues(
+          (v) => fmtWithUnit(v, accelUnit),
+          scaleByMass(row.fileName, row.values?.mean_first_phase_mean_magnitude),
+          scaleByMass(row.fileName, row.values?.mean_second_phase_mean_magnitude),
+        ),
     },
     {
       key: "accelPeak",
+      exportHeader: `Mean ${direction === "deceleration" ? "deceleration" : "acceleration"}${isForceProfile ? " force" : ""} peak`,
       header: `Mean ${direction === "deceleration" ? "deceleration" : "acceleration"}${isForceProfile ? " force" : ""} peak`,
       cellClassName: styles.statsValue,
       renderCell: (row) =>
@@ -355,10 +467,17 @@ export function buildEarlyLateEventColumns({
           scaleByMass(row.fileName, row.values?.mean_first_phase_peak_magnitude),
           scaleByMass(row.fileName, row.values?.mean_second_phase_peak_magnitude),
         ),
+      exportTripletValue: (row) =>
+        getEarlyLateExportValues(
+          (v) => fmtWithUnit(v, accelUnit),
+          scaleByMass(row.fileName, row.values?.mean_first_phase_peak_magnitude),
+          scaleByMass(row.fileName, row.values?.mean_second_phase_peak_magnitude),
+        ),
     },
     {
       key: "powerAvg",
       cellClassName: styles.statsValue,
+      exportHeader: `Mean ${isForceProfile ? "" : "relative "}${isDecel ? "BP" : "PP"} average`,
       renderHeader: () =>
         renderInfoHeader(
           `Mean ${isForceProfile ? "" : "relative "}${isDecel ? "BP" : "PP"} average`,
@@ -377,10 +496,17 @@ export function buildEarlyLateEventColumns({
           scaleByMass(row.fileName, row.values?.mean_first_phase_mean_power),
           scaleByMass(row.fileName, row.values?.mean_second_phase_mean_power),
         ),
+      exportTripletValue: (row) =>
+        getEarlyLateExportValues(
+          (v) => fmtWithUnit(v, powerUnit),
+          scaleByMass(row.fileName, row.values?.mean_first_phase_mean_power),
+          scaleByMass(row.fileName, row.values?.mean_second_phase_mean_power),
+        ),
     },
     {
       key: "powerPeak",
       cellClassName: styles.statsValue,
+      exportHeader: `Mean ${isForceProfile ? "" : "relative "}${isDecel ? "BP" : "PP"} peak`,
       renderHeader: () =>
         renderInfoHeader(
           `Mean ${isForceProfile ? "" : "relative "}${isDecel ? "BP" : "PP"} peak`,
@@ -399,10 +525,17 @@ export function buildEarlyLateEventColumns({
           scaleByMass(row.fileName, row.values?.mean_first_phase_peak_power),
           scaleByMass(row.fileName, row.values?.mean_second_phase_peak_power),
         ),
+      exportTripletValue: (row) =>
+        getEarlyLateExportValues(
+          (v) => fmtWithUnit(v, powerUnit),
+          scaleByMass(row.fileName, row.values?.mean_first_phase_peak_power),
+          scaleByMass(row.fileName, row.values?.mean_second_phase_peak_power),
+        ),
     },
     {
       key: "impulse",
       cellClassName: styles.statsValue,
+      exportHeader: `Mean ${isDecel ? "HBI" : "HPI"}`,
       renderHeader: () =>
         renderInfoHeader(
           `Mean ${isDecel ? "HBI" : "HPI"}`,
@@ -415,6 +548,12 @@ export function buildEarlyLateEventColumns({
       renderCell: (row) =>
         renderEarlyLateCell(
           styles,
+          (v) => fmtWithUnit(v, "N·s"),
+          row.values?.mean_first_phase_impulse,
+          row.values?.mean_second_phase_impulse,
+        ),
+      exportTripletValue: (row) =>
+        getEarlyLateExportValues(
           (v) => fmtWithUnit(v, "N·s"),
           row.values?.mean_first_phase_impulse,
           row.values?.mean_second_phase_impulse,

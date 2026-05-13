@@ -1,9 +1,11 @@
 import { renderInfoHeader } from "../../../utils/analysis/analysisRenderers";
+import { exportAspCsv } from "../../../utils/shared/exportAspCsv";
 import { hexToRgba } from "../../../utils/shared/hexToRgba";
 import styles from "./AnalysisProfilesTable.module.css";
 
 export default function AnalysisProfilesTable({
   rows,
+  exportResults,
   allShown,
   shownCount,
   resultsCount,
@@ -31,6 +33,13 @@ export default function AnalysisProfilesTable({
             {resultsCount} files · {shownCount} shown
           </span>
         </div>
+        <button
+          className={styles.exportBtn}
+          type="button"
+          onClick={() => exportAspCsv({ results: exportResults })}
+        >
+          Export CSV
+        </button>
       </div>
       <div className={`${styles.row} ${styles.head}`}>
         <div className={styles.cellToggle}></div>
@@ -81,7 +90,7 @@ export default function AnalysisProfilesTable({
             <div className={styles.cellMetric}>{row.profileLabel}</div>
             <div className={styles.cellFit}>
               {displayA0 != null && displaySlope != null
-                ? `${profileSymbol} = ${formatNumber(displayA0)} + (${fitSlopeLabel(displaySlope)}) · v`
+                ? `${profileSymbol} = ${formatNumber(displayA0)} + (${fitSlopeLabel(displaySlope)}) x v`
                 : "-"}
             </div>
             <div className={styles.cellMetric}>

@@ -102,7 +102,10 @@ export default function DistributionChart({
       coloraxis: colorAxis,
     };
 
-    const config = { responsive: true };
+    const config = {
+      responsive: true,
+      displayModeBar: true,
+    };
 
     Plotly.react(node, plotData, layout, config);
 

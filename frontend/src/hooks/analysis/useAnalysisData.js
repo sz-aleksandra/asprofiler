@@ -30,7 +30,7 @@ function buildAspProfilesForDirection(visibleResults, hiddenMap, direction) {
         ...p,
         classification: p[classificationKey],
       }));
-      return { name: item.name, profile, points };
+      return { name: item.name, profile, points, direction };
     })
     .filter(Boolean);
 }

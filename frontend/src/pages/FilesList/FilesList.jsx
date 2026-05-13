@@ -174,6 +174,8 @@ export default function FilesList() {
           state: {
             results: successfulResults,
             color_map: buildAnalysisColorMap(successfulResults, colorsMap, defaultColor),
+            analysis_parameters: parameters,
+            per_file_parameters: parametersByFile,
             preprocessing_parameters: preprocessingParameters,
           },
         });

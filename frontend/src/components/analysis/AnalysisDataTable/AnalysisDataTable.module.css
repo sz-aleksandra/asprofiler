@@ -20,6 +20,22 @@
   gap: 14px;
 }
 
+.exportBtn {
+  background: var(--red);
+  color: var(--white);
+  border: 1px solid var(--white);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.exportBtn:hover {
+  background: red;
+  color: white;
+  border: 1px solid white;
+}
+
 .sectionTitleWrap {
   display: inline-flex;
   align-items: center;

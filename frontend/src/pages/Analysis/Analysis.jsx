@@ -33,6 +33,11 @@ import DistributionChart from "../../components/analysis/DistributionChart/Distr
 import TimeSeriesChart from "../../components/analysis/TimeSeriesChart/TimeSeriesChart";
 import TrajectoryChart from "../../components/analysis/TrajectoryChart/TrajectoryChart";
 import AnalysisSidebar from "../../components/analysis/AnalysisSidebar/AnalysisSidebar";
+import { exportAllAnalysisZip } from "../../utils/shared/exportAllAnalysisZip";
+import {
+  exportDirectionalEventTablesZip,
+} from "../../utils/shared/exportEventTableCsv";
+import { exportFilteredGpsSummaryCsv } from "../../utils/shared/exportFilteredGpsSummaryCsv";
 import { hexToRgba } from "../../utils/shared/hexToRgba";
 
 import styles from "./Analysis.module.css";
@@ -64,8 +69,12 @@ export default function Analysis() {
 
   const [storedAnalysisParameters] = useLocalStorage("analysis_params", DEFAULT_ANALYSIS_PARAMS);
   const analysisParameters = useMemo(
-    () => ({ ...DEFAULT_ANALYSIS_PARAMS, ...storedAnalysisParameters }),
-    [storedAnalysisParameters],
+    () => ({
+      ...DEFAULT_ANALYSIS_PARAMS,
+      ...storedAnalysisParameters,
+      ...(analysisState?.analysis_parameters || {}),
+    }),
+    [storedAnalysisParameters, analysisState],
   );
 
   const [storedPreprocessing] = useLocalStorage("analysis_preprocessing", DEFAULT_PREPROCESSING);
@@ -189,6 +198,24 @@ export default function Analysis() {
       </div>
 
       <div className={`${styles.toolbar} ${styles.toolbarNoBorder}`}>
+        <div className={styles.selectionControls} />
+        <button
+          className={styles.exportBtn}
+          type="button"
+          onClick={() =>
+            exportAllAnalysisZip({
+              results,
+              analysisParameters,
+              preprocessingParameters,
+              perFileParameters: analysisState?.per_file_parameters || {},
+            })
+          }
+        >
+          Export All
+        </button>
+      </div>
+
+      <div className={`${styles.toolbar} ${styles.toolbarNoBorder}`}>
         <div className={styles.selectionControls}>
           <ScopeSwitch
             label="Profile view"
@@ -204,6 +231,7 @@ export default function Analysis() {
 
       <AnalysisProfilesTable
         rows={reportAspRows}
+        exportResults={results}
         allShown={allShown}
         shownCount={shownCount}
         resultsCount={results.length}
@@ -309,6 +337,8 @@ export default function Analysis() {
               getRowKey={(row) => `${row.fileName}-${row.metric}`}
               getRowStyle={(row) => ({ background: hexToRgba(colorMap[row.fileName], 0.1) })}
               gridTemplateColumns={STATS_TABLE_GRID_COLUMNS}
+              exportFileName="filtered_gps_summary.csv"
+              onExport={() => exportFilteredGpsSummaryCsv(results)}
             />
 
             <div className={`${styles.timeseriesGrid} ${styles.timeseriesGridCompact}`}>
@@ -445,6 +475,22 @@ export default function Analysis() {
                     getRowKey={(row) => `${row.fileName}-acceleration-event-earlylate-${row.bin}`}
                     getRowStyle={(row) => ({ background: hexToRgba(colorMap[row.fileName], 0.08) })}
                     gridTemplateColumns={EARLY_LATE_TABLE_GRID_COLUMNS}
+                    exportFileName="acceleration_event_summary.zip"
+                    csvMode="earlyLateSplit"
+                    onExport={() =>
+                      exportDirectionalEventTablesZip({
+                        results,
+                        direction: "acceleration",
+                        isForceProfile,
+                        overallColumns: buildEventColumns(
+                          "PP",
+                          "HPI",
+                          "Ratio (A:D)",
+                          "acceleration",
+                        ),
+                        earlyLateColumns: buildEarlyLateEventColumns("acceleration"),
+                      })
+                    }
                   />
                 ) : (
                   <AnalysisDataTable
@@ -454,6 +500,21 @@ export default function Analysis() {
                     getRowKey={(row) => `${row.fileName}-acceleration-event-${row.bin}`}
                     getRowStyle={(row) => ({ background: hexToRgba(colorMap[row.fileName], 0.08) })}
                     gridTemplateColumns={EVENT_TABLE_GRID_COLUMNS}
+                    exportFileName="acceleration_event_summary.zip"
+                    onExport={() =>
+                      exportDirectionalEventTablesZip({
+                        results,
+                        direction: "acceleration",
+                        isForceProfile,
+                        overallColumns: buildEventColumns(
+                          "PP",
+                          "HPI",
+                          "Ratio (A:D)",
+                          "acceleration",
+                        ),
+                        earlyLateColumns: buildEarlyLateEventColumns("acceleration"),
+                      })
+                    }
                   />
                 ))}
               {hasDecelerationEvents &&
@@ -466,6 +527,22 @@ export default function Analysis() {
                     getRowKey={(row) => `${row.fileName}-deceleration-event-earlylate-${row.bin}`}
                     getRowStyle={(row) => ({ background: hexToRgba(colorMap[row.fileName], 0.08) })}
                     gridTemplateColumns={EARLY_LATE_TABLE_GRID_COLUMNS}
+                    exportFileName="deceleration_event_summary.zip"
+                    csvMode="earlyLateSplit"
+                    onExport={() =>
+                      exportDirectionalEventTablesZip({
+                        results,
+                        direction: "deceleration",
+                        isForceProfile,
+                        overallColumns: buildEventColumns(
+                          "BP",
+                          "HBI",
+                          "Ratio (D:A)",
+                          "deceleration",
+                        ),
+                        earlyLateColumns: buildEarlyLateEventColumns("deceleration"),
+                      })
+                    }
                   />
                 ) : (
                   <AnalysisDataTable
@@ -475,6 +552,21 @@ export default function Analysis() {
                     getRowKey={(row) => `${row.fileName}-deceleration-event-${row.bin}`}
                     getRowStyle={(row) => ({ background: hexToRgba(colorMap[row.fileName], 0.08) })}
                     gridTemplateColumns={EVENT_TABLE_GRID_COLUMNS}
+                    exportFileName="deceleration_event_summary.zip"
+                    onExport={() =>
+                      exportDirectionalEventTablesZip({
+                        results,
+                        direction: "deceleration",
+                        isForceProfile,
+                        overallColumns: buildEventColumns(
+                          "BP",
+                          "HBI",
+                          "Ratio (D:A)",
+                          "deceleration",
+                        ),
+                        earlyLateColumns: buildEarlyLateEventColumns("deceleration"),
+                      })
+                    }
                   />
                 ))}
             </div>

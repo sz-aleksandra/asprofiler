@@ -17,6 +17,7 @@ import {
   formatGpsDuration,
   formatNumber,
   formatSecondsValue,
+  formatSpeedPair,
 } from "./analysisFormatters";
 
 function getEventBodyMassKg(results, fileName, direction) {
@@ -44,6 +45,7 @@ export function buildAnalysisTableConfig({
   const statsColumns = buildStatsColumns({
     styles,
     renderSpeedStatValue: speedStatValue,
+    formatSpeedWithKmh: formatSpeedPair,
     fmtWithUnit,
     formatGpsDuration,
     renderInfoHeader: infoHeader,

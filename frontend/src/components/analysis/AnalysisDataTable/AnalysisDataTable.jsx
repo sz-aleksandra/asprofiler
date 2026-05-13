@@ -1,3 +1,4 @@
+import { exportAnalysisTableCsv } from "../../../utils/shared/exportAnalysisTableCsv";
 import styles from "./AnalysisDataTable.module.css";
 
 export default function AnalysisDataTable({
@@ -8,6 +9,9 @@ export default function AnalysisDataTable({
   getRowKey,
   getRowStyle,
   gridTemplateColumns,
+  exportFileName,
+  csvMode = "default",
+  onExport,
 }) {
   return (
     <div className={styles.card}>
@@ -27,6 +31,19 @@ export default function AnalysisDataTable({
             ) : null}
           </div>
         </div>
+        {exportFileName || onExport ? (
+          <button
+            className={styles.exportBtn}
+            type="button"
+            onClick={() =>
+              onExport
+                ? onExport()
+                : exportAnalysisTableCsv({ columns, rows, fileName: exportFileName, csvMode })
+            }
+          >
+            Export CSV
+          </button>
+        ) : null}
       </div>
       <div className={`${styles.row} ${styles.head}`} style={{ gridTemplateColumns }}>
         {columns.map((column) => (
