@@ -1,37 +1,12 @@
-import { downloadCsv } from "./downloadCsv";
-import { createCsvText } from "./downloadCsv";
-
-function formatNumber(value) {
-  return value === undefined || value === null || Number.isNaN(value) ? "" : Number(value).toFixed(2);
-}
-
-function formatDuration(value) {
-  if (value === undefined || value === null || Number.isNaN(value)) return "";
-  const seconds = Number(value);
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secondsPart = (seconds % 60).toFixed(1).padStart(4, "0");
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${secondsPart}`;
-}
-
-function toKmh(value) {
-  return value === undefined || value === null || Number.isNaN(value) ? "" : (Number(value) * 3.6).toFixed(2);
-}
-
-function scaleToForce(value, bodyMassKg) {
-  return value === undefined || value === null || Number.isNaN(value)
-    ? ""
-    : formatNumber(Number(value) * bodyMassKg);
-}
-
-function zoneLabel(zone) {
-  if (zone === "full") return "full";
-  return zone;
-}
-
-function scopeLabel(scope) {
-  return scope === "high_speed_running" ? "high_speed_running" : "all";
-}
+import { downloadCsv, toCsvFile } from "../shared/csvExportUtils";
+import {
+  formatDuration,
+  formatNumber,
+  formatSpeedKmh,
+  scaleToForce,
+  scopeLabel,
+  zoneLabel,
+} from "../shared/csvFormatters";
 
 export function exportFilteredGpsSummaryCsv(results) {
   const file = buildFilteredGpsSummaryFile(results);
@@ -85,19 +60,19 @@ export function buildFilteredGpsSummaryFile(results) {
             formatDuration(row.duration_seconds),
             formatNumber(bodyMassKg),
             isSpeed ? formatNumber(values.min) : "",
-            isSpeed ? toKmh(values.min) : "",
+            isSpeed ? formatSpeedKmh(values.min) : "",
             !isSpeed ? formatNumber(values.min) : "",
             !isSpeed ? scaleToForce(values.min, bodyMassKg) : "",
             isSpeed ? formatNumber(values.mean) : "",
-            isSpeed ? toKmh(values.mean) : "",
+            isSpeed ? formatSpeedKmh(values.mean) : "",
             !isSpeed ? formatNumber(values.mean) : "",
             !isSpeed ? scaleToForce(values.mean, bodyMassKg) : "",
             isSpeed ? formatNumber(values.median) : "",
-            isSpeed ? toKmh(values.median) : "",
+            isSpeed ? formatSpeedKmh(values.median) : "",
             !isSpeed ? formatNumber(values.median) : "",
             !isSpeed ? scaleToForce(values.median, bodyMassKg) : "",
             isSpeed ? formatNumber(values.max) : "",
-            isSpeed ? toKmh(values.max) : "",
+            isSpeed ? formatSpeedKmh(values.max) : "",
             !isSpeed ? formatNumber(values.max) : "",
             !isSpeed ? scaleToForce(values.max, bodyMassKg) : "",
             isSpeed ? formatNumber(values.area) : "",
@@ -109,5 +84,5 @@ export function buildFilteredGpsSummaryFile(results) {
     }
   }
 
-  return { name: "filtered_gps_summary.csv", headers, rows, content: `\uFEFF${createCsvText(headers, rows)}\n` };
+  return toCsvFile("filtered_gps_summary.csv", headers, rows);
 }

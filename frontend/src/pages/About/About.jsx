@@ -6,7 +6,7 @@ export default function About() {
       <h1 className={styles.title}>About</h1>
 
       <p className={styles.paragraph}>
-        This app allows users to visualize acceleration–speed profiles derived from GPS sports data.
+        This app allows users to visualize acceleration-speed profiles derived from GPS sports data.
       </p>
 
       <p className={styles.paragraph}>
@@ -30,7 +30,7 @@ export default function About() {
             target="_blank"
             rel="noreferrer"
           >
-            Morin et al. (2021) Individual acceleration–speed profile in-situ: A proof of concept in
+            Morin et al. (2021) Individual acceleration-speed profile in-situ: A proof of concept in
             professional football players.
           </a>
         </li>

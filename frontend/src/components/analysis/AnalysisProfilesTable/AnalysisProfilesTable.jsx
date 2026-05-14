@@ -1,5 +1,5 @@
 import { renderInfoHeader } from "../../../utils/analysis/analysisRenderers";
-import { exportAspCsv } from "../../../utils/shared/exportAspCsv";
+import { exportAspCsv } from "../../../utils/export/exportAspCsv";
 import { hexToRgba } from "../../../utils/shared/hexToRgba";
 import styles from "./AnalysisProfilesTable.module.css";
 
@@ -30,7 +30,7 @@ export default function AnalysisProfilesTable({
             <span>Show all</span>
           </label>
           <span className={styles.count}>
-            {resultsCount} files · {shownCount} shown
+            {resultsCount} files | {shownCount} shown
           </span>
         </div>
         <button
@@ -90,7 +90,7 @@ export default function AnalysisProfilesTable({
             <div className={styles.cellMetric}>{row.profileLabel}</div>
             <div className={styles.cellFit}>
               {displayA0 != null && displaySlope != null
-                ? `${profileSymbol} = ${formatNumber(displayA0)} + (${fitSlopeLabel(displaySlope)}) x v`
+                ? `${profileSymbol} = ${formatNumber(displayA0)} + (${fitSlopeLabel(displaySlope)}) x speed`
                 : "-"}
             </div>
             <div className={styles.cellMetric}>

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef } from "react";
-import Plotly from "plotly.js-dist-min";
+import { useMemo, useRef } from "react";
 
+import usePlotlyChart from "../../../hooks/analysis/usePlotlyChart";
 import styles from "./DistributionChart.module.css";
 import { getCssVar } from "../../../utils/shared/getCssVar";
 import { hexToRgba } from "../../../utils/shared/hexToRgba";
@@ -57,10 +57,8 @@ export default function DistributionChart({
     return normalized.length ? normalized : null;
   }, [traces]);
 
-  useEffect(() => {
-    if (!containerRef.current || !plotData) return undefined;
-
-    const node = containerRef.current;
+  const layout = useMemo(() => {
+    if (!plotData) return null;
     const heatmapTrace = plotData.find((trace) => trace.type === "heatmap");
     const colorAxis = heatmapTrace
       ? {
@@ -78,7 +76,7 @@ export default function DistributionChart({
           },
         }
       : undefined;
-    const layout = {
+    return {
       title: { text: title, font: { color: cssBlack } },
       font: { color: cssBlack },
       uirevision: title,
@@ -101,17 +99,6 @@ export default function DistributionChart({
       },
       coloraxis: colorAxis,
     };
-
-    const config = {
-      responsive: true,
-      displayModeBar: true,
-    };
-
-    Plotly.react(node, plotData, layout, config);
-
-    const ro = new ResizeObserver(() => Plotly.Plots.resize(node));
-    ro.observe(node);
-    return () => ro.disconnect();
   }, [
     plotData,
     title,
@@ -125,6 +112,9 @@ export default function DistributionChart({
     xAxis,
     yAxis,
   ]);
+
+  const config = useMemo(() => ({ responsive: true, displayModeBar: true }), []);
+  usePlotlyChart({ containerRef, traces: plotData, layout, config, enabled: Boolean(plotData) });
 
   if (!plotData) return null;
 

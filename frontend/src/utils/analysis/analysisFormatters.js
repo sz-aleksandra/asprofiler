@@ -1,17 +1,21 @@
+import { metersPerSecondToKmh } from "../shared/unitConversions";
+
 export function toKmh(value) {
-  return Number(value) * 3.6;
+  return metersPerSecondToKmh(value);
 }
 
-export function formatNumber(v) {
-  return v === undefined || v === null || Number.isNaN(v) ? "-" : Number(v).toFixed(2);
+export function formatNumber(value) {
+  return value === undefined || value === null || Number.isNaN(value)
+    ? "-"
+    : Number(value).toFixed(2);
 }
 
-export function fmtWithUnit(v, unit) {
-  if (v === undefined || v === null || Number.isNaN(v)) return "-";
-  return `${Number(v).toFixed(2)} ${unit}`;
+export function formatWithUnit(value, unit) {
+  if (value === undefined || value === null || Number.isNaN(value)) return "-";
+  return `${Number(value).toFixed(2)} ${unit}`;
 }
 
-export function fmtCount(value) {
+export function formatCount(value) {
   return value === undefined || value === null || Number.isNaN(value)
     ? "-"
     : String(Math.round(Number(value)));

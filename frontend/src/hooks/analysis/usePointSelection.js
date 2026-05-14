@@ -67,14 +67,14 @@ export default function usePointSelection(visibleResults, timeMode) {
       return;
     const key = `${point.name}::${pointIndex}`;
     setSelectedPoints((prev) => {
-      const exists = prev.some((p) => `${p.name}::${p.index}` === key);
+      const exists = prev.some((selectedPoint) => `${selectedPoint.name}::${selectedPoint.index}` === key);
       if (exists) {
         setMarkedPointMap((map) => {
           const next = { ...map };
           delete next[key];
           return next;
         });
-        return prev.filter((p) => `${p.name}::${p.index}` !== key);
+        return prev.filter((selectedPoint) => `${selectedPoint.name}::${selectedPoint.index}` !== key);
       }
       return [...prev, { ...point, index: pointIndex, time: pointTime, rawTime: pointTime }];
     });
@@ -83,7 +83,7 @@ export default function usePointSelection(visibleResults, timeMode) {
   const onAspPointsSelect = (points) => {
     if (!Array.isArray(points) || !points.length) return;
     setSelectedPoints((prev) => {
-      const existing = new Set(prev.map((p) => `${p.name}::${p.index}`));
+      const existing = new Set(prev.map((selectedPoint) => `${selectedPoint.name}::${selectedPoint.index}`));
       const additions = points
         .map((point) => {
           const pointIndex = Number(point?.index);
@@ -107,21 +107,21 @@ export default function usePointSelection(visibleResults, timeMode) {
 
   const toggleSortRule = (key) => {
     setPointsSortRules((prev) => {
-      const idx = prev.findIndex((r) => r.key === key);
-      if (idx === -1) return [...prev, { key, dir: "asc" }];
-      if (prev[idx].dir === "asc") {
+      const ruleIndex = prev.findIndex((rule) => rule.key === key);
+      if (ruleIndex === -1) return [...prev, { key, dir: "asc" }];
+      if (prev[ruleIndex].dir === "asc") {
         const next = [...prev];
-        next[idx] = { ...prev[idx], dir: "desc" };
+        next[ruleIndex] = { ...prev[ruleIndex], dir: "desc" };
         return next;
       }
-      return prev.filter((r) => r.key !== key);
+      return prev.filter((rule) => rule.key !== key);
     });
   };
 
   const sortBadge = (key) => {
-    const idx = pointsSortRules.findIndex((r) => r.key === key);
-    if (idx === -1) return "";
-    return ` ${pointsSortRules[idx].dir === "asc" ? "↑" : "↓"}(${idx + 1})`;
+    const ruleIndex = pointsSortRules.findIndex((rule) => rule.key === key);
+    if (ruleIndex === -1) return "";
+    return ` ${pointsSortRules[ruleIndex].dir}(${ruleIndex + 1})`;
   };
 
   return {

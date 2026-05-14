@@ -14,7 +14,7 @@ export default function Toast({ message, type = "info", onClose, duration = 3000
     <div className={`${styles.toast} ${styles[type]}`} role="status">
       <span className={styles.text}>{message}</span>
       <button className={styles.close} onClick={onClose} aria-label="Close">
-        ×
+        x
       </button>
     </div>
   );

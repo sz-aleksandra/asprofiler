@@ -1,10 +1,11 @@
 import GroupedInput from "../../../ui/form/controls/GroupedInput/GroupedInput";
 import Input from "../../../ui/form/controls/Input/Input";
+import { metersPerSecondToKmh } from "../../../utils/shared/unitConversions";
 
 import styles from "./PerFileParametersPanel.module.css";
 
 function toDisplaySpeed(value, unit) {
-  return unit === "km/h" ? Number(value) * 3.6 : Number(value);
+  return unit === "km/h" ? metersPerSecondToKmh(value) : Number(value);
 }
 
 function fromDisplaySpeed(value, unit) {

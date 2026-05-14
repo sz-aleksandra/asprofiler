@@ -187,7 +187,7 @@ export default function FilesList() {
       setToast({
         message: `Analyzed ${successfulResults.length}/${names.length} file(s): ${names
           .slice(0, 3)
-          .join(", ")}${names.length > 3 ? "…" : ""}.${failedMessage}`,
+          .join(", ")}${names.length > 3 ? "..." : ""}.${failedMessage}`,
         type: successfulResults.length ? "success" : "error",
       });
     } catch (error) {

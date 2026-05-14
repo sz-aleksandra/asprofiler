@@ -1,4 +1,4 @@
-import { downloadCsv } from "./downloadCsv";
+import { downloadCsv } from "../shared/csvExportUtils";
 
 function normalizeCsvCell(value) {
   if (value === null || value === undefined) return "";

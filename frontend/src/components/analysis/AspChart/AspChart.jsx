@@ -1,15 +1,10 @@
-import { useEffect, useMemo, useRef } from "react";
-import Plotly from "plotly.js-dist-min";
+import { useCallback, useMemo, useRef } from "react";
 
+import usePlotlyChart from "../../../hooks/analysis/usePlotlyChart";
 import styles from "./AspChart.module.css";
 import { getCssVar } from "../../../utils/shared/getCssVar";
 import { hexToRgba } from "../../../utils/shared/hexToRgba";
-
-function getContextWindowPoints(allPoints, selectedIndex, pointsBefore, pointsAfter) {
-  const rangeFrom = selectedIndex - pointsBefore;
-  const rangeTo = selectedIndex + pointsAfter;
-  return allPoints.filter((point) => point.index >= rangeFrom && point.index <= rangeTo);
-}
+import { getContextWindowPoints } from "../../../utils/analysis/selectionWindow";
 
 function buildContextTrace(
   itemName,
@@ -96,8 +91,10 @@ export default function AspChart({
     const globalMaxSpeed = valid
       .flatMap((profileItem) =>
         (profileItem.points || [])
-          .filter((p) => p.classification === "included" || p.classification === "selected")
-          .map((p) => p.speed),
+          .filter(
+            (point) => point.classification === "included" || point.classification === "selected",
+          )
+          .map((point) => point.speed),
       )
       .reduce((max, value) => Math.max(max, Number(value)), Number.NEGATIVE_INFINITY);
 
@@ -270,13 +267,12 @@ export default function AspChart({
     pointsBefore,
     pointsAfter,
     formatSpeed,
+    cssBlack,
   ]);
 
-  useEffect(() => {
-    if (!containerRef.current) return undefined;
-    const node = containerRef.current;
-    if (!data) return undefined;
-    const layout = {
+  const layout = useMemo(() => {
+    if (!data) return null;
+    return {
       title: { text: title, font: { color: cssBlack } },
       font: { color: cssBlack },
       uirevision: title,
@@ -318,13 +314,11 @@ export default function AspChart({
         font: { color: cssBlack },
       },
     };
+  }, [data, title, yAxisTitle, speedUnitLabel, cssBlack]);
 
-    const config = {
-      responsive: true,
-      displayModeBar: true,
-    };
-    Plotly.react(node, data.traces, layout, config);
-    const onClick = (event) => {
+  const config = useMemo(() => ({ responsive: true, displayModeBar: true }), []);
+  const onClick = useCallback(
+    (event) => {
       if (!onPointSelect) return;
       const hit = event?.points?.[0];
       const custom = hit?.customdata;
@@ -338,8 +332,11 @@ export default function AspChart({
         acceleration: Number(custom[5]),
         kind: custom[6] || "point",
       });
-    };
-    const onSelected = (event) => {
+    },
+    [onPointSelect],
+  );
+  const onSelected = useCallback(
+    (event) => {
       if (!onPointsSelect) return;
       const hits = Array.isArray(event?.points) ? event.points : [];
       if (!hits.length) return;
@@ -356,20 +353,24 @@ export default function AspChart({
           kind: c[6] || "point",
         }));
       if (points.length) onPointsSelect(points);
-    };
-    node.on("plotly_click", onClick);
-    node.on("plotly_selected", onSelected);
-
-    const ro = new ResizeObserver(() => Plotly.Plots.resize(node));
-    ro.observe(node);
-    return () => {
-      if (typeof node.removeListener === "function") {
-        node.removeListener("plotly_click", onClick);
-        node.removeListener("plotly_selected", onSelected);
-      }
-      ro.disconnect();
-    };
-  }, [data, title, yAxisTitle, onPointSelect, onPointsSelect, speedUnitLabel]);
+    },
+    [onPointsSelect],
+  );
+  const events = useMemo(
+    () => [
+      { name: "plotly_click", handler: onClick },
+      { name: "plotly_selected", handler: onSelected },
+    ],
+    [onClick, onSelected],
+  );
+  usePlotlyChart({
+    containerRef,
+    traces: data?.traces,
+    layout,
+    config,
+    enabled: Boolean(data),
+    events,
+  });
 
   return <div className={styles.chart} ref={containerRef} />;
 }

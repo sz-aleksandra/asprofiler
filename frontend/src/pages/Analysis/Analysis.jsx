@@ -33,11 +33,11 @@ import DistributionChart from "../../components/analysis/DistributionChart/Distr
 import TimeSeriesChart from "../../components/analysis/TimeSeriesChart/TimeSeriesChart";
 import TrajectoryChart from "../../components/analysis/TrajectoryChart/TrajectoryChart";
 import AnalysisSidebar from "../../components/analysis/AnalysisSidebar/AnalysisSidebar";
-import { exportAllAnalysisZip } from "../../utils/shared/exportAllAnalysisZip";
+import { exportAllAnalysisZip } from "../../utils/export/exportAllAnalysisZip";
 import {
   exportDirectionalEventTablesZip,
-} from "../../utils/shared/exportEventTableCsv";
-import { exportFilteredGpsSummaryCsv } from "../../utils/shared/exportFilteredGpsSummaryCsv";
+} from "../../utils/export/exportEventTableCsv";
+import { exportFilteredGpsSummaryCsv } from "../../utils/export/exportFilteredGpsSummaryCsv";
 import { hexToRgba } from "../../utils/shared/hexToRgba";
 
 import styles from "./Analysis.module.css";
@@ -49,8 +49,11 @@ export default function Analysis() {
   useEffect(() => () => setToolsOpen(false), [setToolsOpen]);
 
   const analysisState = location.state;
-  const results = Array.isArray(analysisState?.results) ? analysisState.results : [];
-  const savedColors = analysisState?.color_map || {};
+  const results = useMemo(
+    () => (Array.isArray(analysisState?.results) ? analysisState.results : []),
+    [analysisState],
+  );
+  const savedColors = useMemo(() => analysisState?.color_map || {}, [analysisState]);
 
   const defaultColor = getCssVar("--red");
   const [colors, setColors] = useState({});
@@ -88,7 +91,7 @@ export default function Analysis() {
   );
 
   const prefs = useAnalysisPreferences();
-  const data = useAnalysisData(results, hiddenMap, colorMap, prefs, analysisParameters);
+  const data = useAnalysisData(results, hiddenMap, colorMap, prefs);
   const points = usePointSelection(data.visibleResults, prefs.timeMode);
   const timeFmt = makeTimeFormatters(prefs.timeMode, data.canUseAbsoluteTimeAxis);
 
@@ -469,7 +472,7 @@ export default function Analysis() {
                 (eventPhaseMode === "early_late" ? (
                   <AnalysisDataTable
                     title="Acceleration event early/late phase statistics"
-                    titleTooltipLines={["Split point = 50% v exit."]}
+                    titleTooltipLines={["Split point = 50% exit speed."]}
                     columns={buildEarlyLateEventColumns("acceleration")}
                     rows={accelerationEventRows}
                     getRowKey={(row) => `${row.fileName}-acceleration-event-earlylate-${row.bin}`}
@@ -521,7 +524,7 @@ export default function Analysis() {
                 (eventPhaseMode === "early_late" ? (
                   <AnalysisDataTable
                     title="Deceleration event early/late phase statistics"
-                    titleTooltipLines={["Split point = 50% v entry."]}
+                    titleTooltipLines={["Split point = 50% entry speed."]}
                     columns={buildEarlyLateEventColumns("deceleration")}
                     rows={decelerationEventRows}
                     getRowKey={(row) => `${row.fileName}-deceleration-event-earlylate-${row.bin}`}

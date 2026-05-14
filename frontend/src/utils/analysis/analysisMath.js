@@ -56,7 +56,7 @@ export function metricUnits(metric) {
   if (metric === "speed") return { value: "m/s", area: "km" };
   if (metric === "acceleration") return { value: "m/s²", area: "m/s" };
   if (metric === "deceleration") return { value: "m/s²", area: "m/s" };
-  if (metric === "force_acceleration") return { value: "N", area: "N·s" };
-  if (metric === "force_deceleration") return { value: "N", area: "N·s" };
+  if (metric === "force_acceleration") return { value: "N", area: "N x s" };
+  if (metric === "force_deceleration") return { value: "N", area: "N x s" };
   return { value: "", area: null };
 }

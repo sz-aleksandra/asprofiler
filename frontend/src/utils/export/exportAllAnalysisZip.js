@@ -1,14 +1,8 @@
-import JSZip from "jszip";
-
+import { downloadZip } from "../shared/csvExportUtils";
+import { toKmh } from "../shared/csvFormatters";
 import { buildAspExportFiles } from "./exportAspCsv";
 import { buildDirectionalEventExportFiles } from "./exportEventTableCsv";
 import { buildFilteredGpsSummaryFile } from "./exportFilteredGpsSummaryCsv";
-
-function toKmh(value) {
-  return value === undefined || value === null || Number.isNaN(value)
-    ? value
-    : Number(value) * 3.6;
-}
 
 function normalizeAnalysisParameters(parameters = {}) {
   return {
@@ -53,66 +47,61 @@ function normalizePreprocessingParameters(parameters = {}) {
   };
 }
 
-function downloadBlob(blob, fileName) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-
 export async function exportAllAnalysisZip({
   results,
   analysisParameters = {},
   preprocessingParameters = {},
   perFileParameters = {},
 }) {
-  const zip = new JSZip();
-  buildAllAnalysisZip(zip, {
-    results,
-    analysisParameters,
-    preprocessingParameters,
-    perFileParameters,
-  });
+  await downloadZip(
+    buildAllAnalysisZipFiles({
+      results,
+      analysisParameters,
+      preprocessingParameters,
+      perFileParameters,
+    }),
+    "analysis.zip",
+  );
+}
 
-  const zipBlob = await zip.generateAsync({ type: "blob" });
-  downloadBlob(zipBlob, "analysis.zip");
+export function buildAllAnalysisZipFiles({
+  results,
+  analysisParameters = {},
+  preprocessingParameters = {},
+  perFileParameters = {},
+}) {
+  const filteredGpsSummary = buildFilteredGpsSummaryFile(results);
+  return [
+    ...buildAspExportFiles(results),
+    filteredGpsSummary,
+    ...buildDirectionalEventExportFiles(results, "acceleration"),
+    ...buildDirectionalEventExportFiles(results, "deceleration"),
+    {
+      name: "analysis_parameters.json",
+      content: `${JSON.stringify(
+        {
+          analysis_parameters: normalizeAnalysisParameters(analysisParameters),
+          per_file_parameters: normalizePerFileParameters(perFileParameters),
+          preprocessing_parameters: normalizePreprocessingParameters(preprocessingParameters),
+        },
+        null,
+        2,
+      )}\n`,
+    },
+  ];
 }
 
 export function buildAllAnalysisZip(
   zip,
   { results, analysisParameters = {}, preprocessingParameters = {}, perFileParameters = {} },
 ) {
-  buildAspExportFiles(results).forEach((file) => {
+  buildAllAnalysisZipFiles({
+    results,
+    analysisParameters,
+    preprocessingParameters,
+    perFileParameters,
+  }).forEach((file) => {
     zip.file(file.name, file.content);
   });
-
-  const filteredGpsSummary = buildFilteredGpsSummaryFile(results);
-  zip.file(filteredGpsSummary.name, filteredGpsSummary.content);
-
-  buildDirectionalEventExportFiles(results, "acceleration").forEach((file) => {
-    zip.file(file.name, file.content);
-  });
-
-  buildDirectionalEventExportFiles(results, "deceleration").forEach((file) => {
-    zip.file(file.name, file.content);
-  });
-
-  zip.file(
-    "analysis_parameters.json",
-    `${JSON.stringify(
-      {
-        analysis_parameters: normalizeAnalysisParameters(analysisParameters),
-        per_file_parameters: normalizePerFileParameters(perFileParameters),
-        preprocessing_parameters: normalizePreprocessingParameters(preprocessingParameters),
-      },
-      null,
-      2,
-    )}\n`,
-  );
-
   return zip;
 }

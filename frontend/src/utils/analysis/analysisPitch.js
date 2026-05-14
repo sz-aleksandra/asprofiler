@@ -31,7 +31,6 @@ export function projectPitchPoints(latitudes, longitudes, speeds, speedThreshold
     fastPoints.reduce((sum, point) => sum + toRadians(point.longitude), 0) / fastPoints.length;
 
   const projected = points.map((point) => {
-    const latRad = toRadians(point.latitude);
     const lonRad = toRadians(point.longitude);
     return {
       index: point.index,

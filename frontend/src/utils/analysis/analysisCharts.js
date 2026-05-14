@@ -117,9 +117,11 @@ export function buildDirectionalEventDistributionChart({
     return { label: bin.label, lower, upper, slotStart: index, slotEnd: index + 1 };
   });
   const tickvals = [...resolved.map((bin) => bin.slotStart), resolved[resolved.length - 1].slotEnd];
-  const scaleTick = (n) => {
-    const v = Number(n) * axisScale;
-    return Number.isInteger(v) ? String(v) : String(Number(v.toFixed(2)));
+  const scaleTick = (tickValue) => {
+    const scaledValue = Number(tickValue) * axisScale;
+    return Number.isInteger(scaledValue)
+      ? String(scaledValue)
+      : String(Number(scaledValue.toFixed(2)));
   };
   const ticktext = [
     ...resolved.map((bin) => scaleTick(bin.lower)),

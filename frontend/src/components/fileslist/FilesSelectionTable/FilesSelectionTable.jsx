@@ -38,7 +38,7 @@ export default function FilesSelectionTable({
             <span>Select all</span>
           </label>
           <span className={styles.count}>
-            {pendingFiles.length} files · {selected.size} selected
+            {pendingFiles.length} files | {selected.size} selected
           </span>
         </div>
         <div className={styles.actionsGroup}>

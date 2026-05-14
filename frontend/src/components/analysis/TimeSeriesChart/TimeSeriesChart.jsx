@@ -1,9 +1,50 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import Plotly from "plotly.js-dist-min";
 
+import usePlotlyChart from "../../../hooks/analysis/usePlotlyChart";
 import styles from "./TimeSeriesChart.module.css";
 import { getCssVar } from "../../../utils/shared/getCssVar";
 import { hexToRgba } from "../../../utils/shared/hexToRgba";
+import { getContextWindowPoints } from "../../../utils/analysis/selectionWindow";
+
+function buildTickConfig(referenceX, referenceLabels, xTickFormatter, minX, maxX) {
+  if (typeof xTickFormatter !== "function" || !Array.isArray(referenceX) || referenceX.length === 0) {
+    return null;
+  }
+
+  const points = referenceX
+    .map((value, index) => ({ value: Number(value), index }))
+    .filter(({ value }) => Number.isFinite(value))
+    .filter(({ value }) =>
+      Number.isFinite(minX) && Number.isFinite(maxX) ? value >= minX && value <= maxX : true,
+    );
+
+  const sourceIndexes = (
+    points.length ? points : referenceX.map((value, index) => ({ value, index }))
+  ).map(({ index }) => index);
+  if (!sourceIndexes.length) return null;
+
+  const maxTicks = Math.min(10, sourceIndexes.length);
+  const tickIndexes = Array.from(
+    { length: maxTicks },
+    (_, tickIndex) =>
+      sourceIndexes[
+        Math.round((tickIndex * (sourceIndexes.length - 1)) / Math.max(maxTicks - 1, 1))
+      ],
+  );
+  const uniqueIndexes = [...new Set(tickIndexes)];
+  const tickvals = uniqueIndexes.map((sourceIndex) => Number(referenceX[sourceIndex]));
+  const ticktext = uniqueIndexes.map((sourceIndex) =>
+    xTickFormatter(Number(referenceX[sourceIndex]), referenceLabels?.[sourceIndex], sourceIndex),
+  );
+
+  return {
+    tickmode: "array",
+    tickvals,
+    ticktext,
+    signature: JSON.stringify([tickvals, ticktext]),
+  };
+}
 
 export default function TimeSeriesChart({
   title,
@@ -24,46 +65,6 @@ export default function TimeSeriesChart({
   const applyingTicksRef = useRef(false);
   const lastTickSignatureRef = useRef("");
   const cssBlack = getCssVar("--black");
-  const buildTickConfig = (referenceX, referenceLabels, minX, maxX) => {
-    if (
-      typeof xTickFormatter !== "function" ||
-      !Array.isArray(referenceX) ||
-      referenceX.length === 0
-    ) {
-      return null;
-    }
-
-    const points = referenceX
-      .map((value, index) => ({ value: Number(value), index }))
-      .filter(({ value }) => Number.isFinite(value))
-      .filter(({ value }) =>
-        Number.isFinite(minX) && Number.isFinite(maxX) ? value >= minX && value <= maxX : true,
-      );
-
-    const sourceIndexes = (
-      points.length ? points : referenceX.map((value, index) => ({ value, index }))
-    ).map(({ index }) => index);
-    if (!sourceIndexes.length) return null;
-
-    const maxTicks = Math.min(10, sourceIndexes.length);
-    const tickIndexes = Array.from(
-      { length: maxTicks },
-      (_, idx) =>
-        sourceIndexes[Math.round((idx * (sourceIndexes.length - 1)) / Math.max(maxTicks - 1, 1))],
-    );
-    const uniqueIndexes = [...new Set(tickIndexes)];
-    const tickvals = uniqueIndexes.map((idx) => Number(referenceX[idx]));
-    const ticktext = uniqueIndexes.map((idx) =>
-      xTickFormatter(Number(referenceX[idx]), referenceLabels?.[idx], idx),
-    );
-
-    return {
-      tickmode: "array",
-      tickvals,
-      ticktext,
-      signature: JSON.stringify([tickvals, ticktext]),
-    };
-  };
 
   const plotData = useMemo(() => {
     if (!series?.length) return null;
@@ -79,25 +80,25 @@ export default function TimeSeriesChart({
       return String(xValue);
     };
     const next = series
-      .filter((s) => {
-        const x = s.x || time;
-        return x?.length && s.values?.length;
+      .filter((seriesItem) => {
+        const xValues = seriesItem.x || time;
+        return xValues?.length && seriesItem.values?.length;
       })
-      .map((s) => {
-        const baseColor = s.color;
-        const labels = Array.isArray(s.labels) ? s.labels : [];
-        const xValues = s.x || time;
+      .map((seriesItem) => {
+        const baseColor = seriesItem.color;
+        const labels = Array.isArray(seriesItem.labels) ? seriesItem.labels : [];
+        const xValues = seriesItem.x || time;
         return {
-          name: s.name,
+          name: seriesItem.name,
           type: "scattergl",
           mode: "lines",
           x: xValues,
-          y: s.values,
+          y: seriesItem.values,
           customdata: xValues.map((xValue, index) => {
-            const yValue = s.values[index];
+            const yValue = seriesItem.values[index];
             const valueLabel =
               typeof valueLabelFormatter === "function"
-                ? valueLabelFormatter(yValue, s, index)
+                ? valueLabelFormatter(yValue, seriesItem, index)
                 : "Value";
             return [getHoverTimeLabel(xValue, labels[index] || "", index), valueLabel];
           }),
@@ -109,18 +110,18 @@ export default function TimeSeriesChart({
     if (!next.length) return null;
 
     const selections = (selectedPoints || []).filter(
-      (p) => p?.name && Number.isInteger(Number(p?.index)),
+      (point) => point?.name && Number.isInteger(Number(point?.index)),
     );
     const shapes = [];
     const selectedIndexBySeries = new Map();
     if (selections.length > 0) {
-      selections.forEach((sel) => {
-        const selectedName = sel.name;
-        const selectedIndex = Number(sel.index);
+      selections.forEach((selection) => {
+        const selectedName = selection.name;
+        const selectedIndex = Number(selection.index);
         const indexSet = selectedIndexBySeries.get(selectedName) || new Set();
         indexSet.add(selectedIndex);
         selectedIndexBySeries.set(selectedName, indexSet);
-        const target = series.find((s) => s.name === selectedName);
+        const target = series.find((seriesItem) => seriesItem.name === selectedName);
         const xData = target?.x || time;
         const yData = target?.values;
         if (
@@ -149,28 +150,31 @@ export default function TimeSeriesChart({
           });
         }
 
-        const pFrom = Math.max(0, selectedIndex - pointsBefore);
-        const pTo = Math.min(xData.length - 1, selectedIndex + pointsAfter);
-        const xWindow = xData.slice(pFrom, pTo + 1);
-        const yWindow = yData.slice(pFrom, pTo + 1);
-        if (xWindow.length > 1) {
+        const pointWindow = getContextWindowPoints(
+          xData.map((xValue, index) => ({ index, xValue, yValue: yData[index] })),
+          selectedIndex,
+          pointsBefore,
+          pointsAfter,
+        );
+        if (pointWindow.length > 1) {
           const selectedSet = selectedIndexBySeries.get(selectedName) || new Set();
-          const markerSizes = xWindow.map((_, i) => (selectedSet.has(pFrom + i) ? 0 : 7));
-          const labelWindow = target?.labels?.slice(pFrom, pTo + 1) || [];
+          const markerSizes = pointWindow.map((point) => (selectedSet.has(point.index) ? 0 : 7));
+          const labelWindow = pointWindow.map((point) => target?.labels?.[point.index] || "");
           next.push({
             name: `${selectedName} context`,
             type: "scatter",
             mode: "lines+markers",
-            x: xWindow,
-            y: yWindow,
-            customdata: xWindow.map((xValue, index) => {
-              const pointIndex = pFrom + index;
-              const yValue = yWindow[index];
+            x: pointWindow.map((point) => point.xValue),
+            y: pointWindow.map((point) => point.yValue),
+            customdata: pointWindow.map((point, index) => {
               const valueLabel =
                 typeof valueLabelFormatter === "function"
-                  ? valueLabelFormatter(yValue, target, pointIndex)
+                  ? valueLabelFormatter(point.yValue, target, point.index)
                   : "Value";
-              return [getHoverTimeLabel(xValue, labelWindow[index] || "", pointIndex), valueLabel];
+              return [
+                getHoverTimeLabel(point.xValue, labelWindow[index] || "", point.index),
+                valueLabel,
+              ];
             }),
             hovertemplate:
               "Time: %{customdata[0]}<br>%{customdata[1]}: %{y:.3f}<extra>%{fullData.name}</extra>",
@@ -232,8 +236,11 @@ export default function TimeSeriesChart({
       }));
 
     const referenceSeries = [...series]
-      .filter((s) => (s.x || time)?.length)
-      .sort((a, b) => ((b.x || time)?.length || 0) - ((a.x || time)?.length || 0))[0];
+      .filter((seriesItem) => (seriesItem.x || time)?.length)
+      .sort(
+        (firstSeries, secondSeries) =>
+          ((secondSeries.x || time)?.length || 0) - ((firstSeries.x || time)?.length || 0),
+      )[0];
 
     return {
       traces: next,
@@ -254,11 +261,9 @@ export default function TimeSeriesChart({
     valueLabelFormatter,
   ]);
 
-  useEffect(() => {
-    if (!containerRef.current) return undefined;
-    const node = containerRef.current;
-    if (!plotData) return undefined;
-    const layout = {
+  const layout = useMemo(() => {
+    if (!plotData) return null;
+    const nextLayout = {
       title: { text: title, font: { color: cssBlack } },
       font: { color: cssBlack },
       uirevision: title,
@@ -285,21 +290,34 @@ export default function TimeSeriesChart({
       },
     };
 
-    const initialTickConfig = buildTickConfig(plotData.referenceX, plotData.referenceLabels);
+    const initialTickConfig = buildTickConfig(
+      plotData.referenceX,
+      plotData.referenceLabels,
+      xTickFormatter,
+    );
     if (initialTickConfig) {
-      lastTickSignatureRef.current = initialTickConfig.signature;
-      layout.xaxis.tickmode = initialTickConfig.tickmode;
-      layout.xaxis.tickvals = initialTickConfig.tickvals;
-      layout.xaxis.ticktext = initialTickConfig.ticktext;
+      nextLayout.xaxis.tickmode = initialTickConfig.tickmode;
+      nextLayout.xaxis.tickvals = initialTickConfig.tickvals;
+      nextLayout.xaxis.ticktext = initialTickConfig.ticktext;
     }
 
-    const config = {
-      responsive: true,
-      displayModeBar: true,
-    };
-    Plotly.react(node, plotData.traces, layout, config);
+    return nextLayout;
+  }, [plotData, title, xTitle, yTitle, xTickFormatter, xIncludeZero, cssBlack]);
 
-    const onRelayout = (event) => {
+  useEffect(() => {
+    const initialTickConfig = buildTickConfig(
+      plotData?.referenceX,
+      plotData?.referenceLabels,
+      xTickFormatter,
+    );
+    lastTickSignatureRef.current = initialTickConfig?.signature || "";
+  }, [plotData, xTickFormatter]);
+
+  const onRelayout = useCallback(
+    (event) => {
+      const node = containerRef.current;
+      if (!node) return;
+
       if (applyingTicksRef.current) {
         applyingTicksRef.current = false;
         return;
@@ -311,8 +329,8 @@ export default function TimeSeriesChart({
       const maxX = Number(event?.["xaxis.range[1]"]);
       const nextTickConfig =
         event?.["xaxis.autorange"] === true
-          ? buildTickConfig(plotData.referenceX, plotData.referenceLabels)
-          : buildTickConfig(plotData.referenceX, plotData.referenceLabels, minX, maxX);
+          ? buildTickConfig(plotData.referenceX, plotData.referenceLabels, xTickFormatter)
+          : buildTickConfig(plotData.referenceX, plotData.referenceLabels, xTickFormatter, minX, maxX);
 
       if (!nextTickConfig || nextTickConfig.signature === lastTickSignatureRef.current) return;
 
@@ -325,18 +343,22 @@ export default function TimeSeriesChart({
       }).catch(() => {
         applyingTicksRef.current = false;
       });
-    };
-    node.on("plotly_relayout", onRelayout);
-
-    const ro = new ResizeObserver(() => Plotly.Plots.resize(node));
-    ro.observe(node);
-    return () => {
-      if (typeof node.removeListener === "function") {
-        node.removeListener("plotly_relayout", onRelayout);
-      }
-      ro.disconnect();
-    };
-  }, [plotData, title, xTitle, yTitle, xTickFormatter, xIncludeZero]);
+    },
+    [containerRef, plotData, xTickFormatter],
+  );
+  const config = useMemo(() => ({ responsive: true, displayModeBar: true }), []);
+  const events = useMemo(
+    () => [{ name: "plotly_relayout", handler: onRelayout }],
+    [onRelayout],
+  );
+  usePlotlyChart({
+    containerRef,
+    traces: plotData?.traces,
+    layout,
+    config,
+    enabled: Boolean(plotData),
+    events,
+  });
 
   if (!plotData) return null;
 

@@ -26,16 +26,16 @@ function buildAspProfilesForDirection(visibleResults, hiddenMap, direction) {
     .map((item) => {
       const profile = item.profile?.[profileKey];
       if (!profile) return null;
-      const points = (item.profile?.points || []).map((p) => ({
-        ...p,
-        classification: p[classificationKey],
+      const points = (item.profile?.points || []).map((point) => ({
+        ...point,
+        classification: point[classificationKey],
       }));
       return { name: item.name, profile, points, direction };
     })
     .filter(Boolean);
 }
 
-export default function useAnalysisData(results, hiddenMap, colorMap, prefs, analysisParameters) {
+export default function useAnalysisData(results, hiddenMap, colorMap, prefs) {
   const {
     speedSeriesUnit,
     timeMode,
@@ -103,7 +103,7 @@ export default function useAnalysisData(results, hiddenMap, colorMap, prefs, ana
       if (timeseries.time.length && timeseries.speed.length) {
         speedSeries.push({
           name: item.name,
-          values: timeseries.speed.map((v) => Number(v) * speedSeriesFactor),
+          values: timeseries.speed.map((speedValue) => Number(speedValue) * speedSeriesFactor),
           color,
           x: timeseries.relative_time,
           labels: timeMode === "absolute" ? timeseries.time : [],
@@ -113,7 +113,7 @@ export default function useAnalysisData(results, hiddenMap, colorMap, prefs, ana
         const accelMultiplier = isForceProfile ? getBodyMassKg(item) : 1;
         accelerationSeries.push({
           name: item.name,
-          values: timeseries.acceleration.map((v) => Number(v) * accelMultiplier),
+          values: timeseries.acceleration.map((accelerationValue) => Number(accelerationValue) * accelMultiplier),
           color,
           x: timeseries.relative_time,
           labels: timeMode === "absolute" ? timeseries.time : [],
@@ -198,13 +198,13 @@ export default function useAnalysisData(results, hiddenMap, colorMap, prefs, ana
     statisticsScopeMode,
     eventZoneMode,
     isForceProfile,
-    analysisParameters,
   ]);
 
   const isDirectionVisibleFn = (fileName, direction) =>
     isDirectionVisible(hiddenMap, fileName, direction);
 
-  const fmtEventBinLabel = (label) => formatEventBinLabel(label, eventBinMode, isForceProfile);
+  const formatCurrentEventBinLabel = (label) =>
+    formatEventBinLabel(label, eventBinMode, isForceProfile);
 
   const eventRowsByDirection = useMemo(
     () =>
@@ -286,6 +286,6 @@ export default function useAnalysisData(results, hiddenMap, colorMap, prefs, ana
     accelerationDistributionChart: eventDistributionChartsByDirection.acceleration,
     decelerationDistributionChart: eventDistributionChartsByDirection.deceleration,
     metricUnits,
-    formatEventBinLabel: fmtEventBinLabel,
+    formatEventBinLabel: formatCurrentEventBinLabel,
   };
 }

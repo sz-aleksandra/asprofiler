@@ -11,8 +11,8 @@ export const STATS_TABLE_GRID_COLUMNS = "minmax(280px, 2fr) repeat(6, minmax(52p
 import { buildStatsTableData } from "../shared/analysisRows";
 import { renderSpeedStatValue, renderInfoHeader } from "./analysisRenderers";
 import {
-  fmtCount,
-  fmtWithUnit,
+  formatCount,
+  formatWithUnit,
   formatDistanceKm,
   formatGpsDuration,
   formatNumber,
@@ -21,7 +21,7 @@ import {
 } from "./analysisFormatters";
 
 function getEventBodyMassKg(results, fileName, direction) {
-  const item = results.find((r) => r.name === fileName);
+  const item = results.find((result) => result.name === fileName);
   const profile =
     direction === "acceleration"
       ? item.profile.acceleration_profile
@@ -46,7 +46,7 @@ export function buildAnalysisTableConfig({
     styles,
     renderSpeedStatValue: speedStatValue,
     formatSpeedWithKmh: formatSpeedPair,
-    fmtWithUnit,
+    formatWithUnit,
     formatGpsDuration,
     renderInfoHeader: infoHeader,
     isForceProfile,
@@ -61,9 +61,9 @@ export function buildAnalysisTableConfig({
       ratioLabel,
       direction,
       formatEventBinLabel,
-      fmtCount,
+      formatCount,
       formatNumber,
-      fmtWithUnit,
+      formatWithUnit,
       formatSecondsValue,
       renderSpeedWithKmh: speedStatValue,
       renderInfoHeader: infoHeader,
@@ -76,7 +76,7 @@ export function buildAnalysisTableConfig({
       styles,
       direction,
       formatEventBinLabel,
-      fmtWithUnit,
+      formatWithUnit,
       formatSecondsValue,
       renderInfoHeader: infoHeader,
       isForceProfile,

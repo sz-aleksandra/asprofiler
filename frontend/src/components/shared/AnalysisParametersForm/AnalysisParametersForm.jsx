@@ -1,11 +1,12 @@
 import GroupedInput from "../../../ui/form/controls/GroupedInput/GroupedInput";
 import Input from "../../../ui/form/controls/Input/Input";
 import Select from "../../../ui/form/controls/Select/Select";
+import { metersPerSecondToKmh } from "../../../utils/shared/unitConversions";
 
 import styles from "./AnalysisParametersForm.module.css";
 
 function toDisplaySpeed(value, unit) {
-  return unit === "km/h" ? Number(value) * 3.6 : Number(value);
+  return unit === "km/h" ? metersPerSecondToKmh(value) : Number(value);
 }
 
 function fromDisplaySpeed(value, unit) {
@@ -43,7 +44,7 @@ export default function AnalysisParametersForm({
               <option value="none">None</option>
               <option value="median">Median</option>
               <option value="mean">Mean</option>
-              <option value="median_mean">Median → Mean</option>
+              <option value="median_mean">Median to Mean</option>
               <option value="butterworth">Butterworth (4th order, 2 Hz)</option>
             </Select>
           </label>

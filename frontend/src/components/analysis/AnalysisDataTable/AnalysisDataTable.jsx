@@ -1,4 +1,4 @@
-import { exportAnalysisTableCsv } from "../../../utils/shared/exportAnalysisTableCsv";
+import { exportAnalysisTableCsv } from "../../../utils/export/exportAnalysisTableCsv";
 import styles from "./AnalysisDataTable.module.css";
 
 export default function AnalysisDataTable({

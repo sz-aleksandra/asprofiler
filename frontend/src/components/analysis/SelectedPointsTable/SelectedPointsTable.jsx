@@ -51,7 +51,7 @@ export default function SelectedPointsTable({
             <span>Select all</span>
           </label>
           <span className={styles.count}>
-            {visibleSelectedPoints.length} points · {selectedVisibleCount} selected
+            {visibleSelectedPoints.length} points | {selectedVisibleCount} selected
           </span>
         </div>
         <div className={styles.controls}>
@@ -112,20 +112,20 @@ export default function SelectedPointsTable({
             type="button"
             onClick={() => toggleSortRule("name")}
           >
-            Filename{sortBadge("name") || " ↕"}
+            Filename{sortBadge("name") || " sort"}
           </button>
           <button className={styles.sortBtn} type="button" onClick={() => toggleSortRule("time")}>
-            Time{sortBadge("time") || " ↕"}
+            Time{sortBadge("time") || " sort"}
           </button>
           <button className={styles.sortBtn} type="button" onClick={() => toggleSortRule("speed")}>
-            Speed{sortBadge("speed") || " ↕"}
+            Speed{sortBadge("speed") || " sort"}
           </button>
           <button
             className={styles.sortBtn}
             type="button"
             onClick={() => toggleSortRule("acceleration")}
           >
-            Acceleration{sortBadge("acceleration") || " ↕"}
+            Acceleration{sortBadge("acceleration") || " sort"}
           </button>
           <div className={styles.actions}></div>
         </div>
@@ -159,7 +159,9 @@ export default function SelectedPointsTable({
                 type="button"
                 onClick={() => {
                   const key = pointKey(point);
-                  setSelectedPoints((prev) => prev.filter((p) => pointKey(p) !== key));
+                  setSelectedPoints((previousPoints) =>
+                    previousPoints.filter((point) => pointKey(point) !== key),
+                  );
                   setMarkedPointMap((prev) => {
                     const next = { ...prev };
                     delete next[key];
