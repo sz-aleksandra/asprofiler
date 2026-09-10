@@ -1,17 +1,26 @@
 import styles from "./About.module.css";
-
 export default function About() {
   return (
-    <section className={styles.page}>
+    <div className={styles.aboutPage}>
       <h1 className={styles.title}>About</h1>
 
       <p className={styles.paragraph}>
-        This app allows users to visualize acceleration-speed profiles derived from GPS sports data.
+        This app supports configurable analysis of football players' GNSS/GPS session data from
+        STATSports CSV exports.
       </p>
 
       <p className={styles.paragraph}>
-        Uploaded files should have proper structure. They must be <strong>.csv</strong> files and
-        include <strong>acc</strong> and <strong>speed</strong> columns.
+        Uploaded files must be <strong>.csv</strong> files and include <strong>Time</strong>,{" "}
+        <strong>Speed (m/s)</strong>, <strong>Lat</strong>, <strong>Lon</strong>,{" "}
+        <strong>Hacc</strong>, <strong>Hdop</strong>, and{" "}
+        <strong>No. of Satellites</strong> columns.
+      </p>
+
+      <p className={styles.paragraph}>
+        The application filters samples by GNSS signal quality, normalizes the input data, and
+        supports analysis of acceleration-speed profiles, deceleration-speed profiles, high-speed
+        running, acceleration and deceleration events, pitch zones, time series, trajectories, and
+        exportable results.
       </p>
 
       <p className={styles.disclaimer}>
@@ -27,14 +36,14 @@ export default function About() {
         <li>
           <a
             href="https://www.researchgate.net/publication/351607405_Individual_acceleration-speed_profile_in-situ_A_proof_of_concept_in_professional_football_players"
+            rel="noopener noreferrer"
             target="_blank"
-            rel="noreferrer"
           >
-            Morin et al. (2021) Individual acceleration-speed profile in-situ: A proof of concept in
-            professional football players.
+            Morin et al. (2021) Individual acceleration-speed analysis profile in-situ: A proof of
+            concept in professional football players.
           </a>
         </li>
       </ol>
-    </section>
+    </div>
   );
 }

@@ -1,77 +1,83 @@
 const REQUIRED_COLUMNS = ["Time", "Speed (m/s)", "Lat", "Lon", "Hacc", "Hdop", "No. of Satellites"];
 
-const DEFAULT_FILTERS = {
-  maximumHorizontalAccuracyMeters: 2,
-  maximumHorizontalDilutionOfPrecision: 1,
-  minimumSatellites: 6,
-};
-
-function mean(values) {
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+function mean(gpsCsvValues) {
+  return (
+    gpsCsvValues.reduce((gpsCsvValuesSum, gpsCsvValue) => gpsCsvValuesSum + gpsCsvValue, 0) /
+    gpsCsvValues.length
+  );
 }
 
-export async function normalizeGpsCsvFile(file, options = {}) {
-  const filters = { ...DEFAULT_FILTERS, ...options };
+function filterByQuality(csvRows, csvQualityFilters) {
+  return csvRows.filter(
+    (csvRow) =>
+      csvRow.horizontalAccuracyM <= csvQualityFilters.maxHorizontalAccuracyM &&
+      csvRow.horizontalDilutionOfPrecision <= csvQualityFilters.maxHorizontalDilutionOfPrecision &&
+      csvRow.satelliteCount >= csvQualityFilters.minSatelliteCount,
+  );
+}
 
-  const lines = (await file.text())
+function parseGpsCsv(csvText) {
+  const csvLines = csvText
     .replace(/^\uFEFF/, "")
     .split(/\r?\n/)
     .filter(Boolean);
 
-  if (lines.length < 2) throw new Error("Invalid CSV: file is empty");
+  if (csvLines.length < 2) throw new Error("Invalid CSV: no data rows");
 
-  const headers = lines[0].split(",").map((header) => header.trim());
+  const csvHeaders = csvLines[0].split(",").map((csvHeader) => csvHeader.trim());
   const columnIndex = Object.fromEntries(
-    REQUIRED_COLUMNS.map((name) => [name, headers.indexOf(name)]),
+    REQUIRED_COLUMNS.map((columnName) => [columnName, csvHeaders.indexOf(columnName)]),
   );
 
-  const missing = REQUIRED_COLUMNS.filter((name) => columnIndex[name] === -1);
-  if (missing.length) {
-    throw new Error(`Invalid CSV: missing columns: ${missing.join(", ")}`);
+  const missingColumns = REQUIRED_COLUMNS.filter((columnName) => columnIndex[columnName] === -1);
+  if (missingColumns.length) {
+    throw new Error(`Invalid CSV: missing columns: ${missingColumns.join(", ")}`);
   }
 
-  const rows = lines.slice(1).map((line) => {
-    const cells = line.split(",");
+  return csvLines.slice(1).map((csvLine) => {
+    const cells = csvLine.split(",");
     return {
       time: cells[columnIndex["Time"]].trim(),
       speed: Number(cells[columnIndex["Speed (m/s)"]]),
-      latitude: Number(cells[columnIndex["Lat"]]),
-      longitude: Number(cells[columnIndex["Lon"]]),
-      horizontalAccuracyMeters: Number(cells[columnIndex["Hacc"]]),
+      lat: Number(cells[columnIndex["Lat"]]),
+      lon: Number(cells[columnIndex["Lon"]]),
+      horizontalAccuracyM: Number(cells[columnIndex["Hacc"]]),
       horizontalDilutionOfPrecision: Number(cells[columnIndex["Hdop"]]),
-      satellites: Number(cells[columnIndex["No. of Satellites"]]),
+      satelliteCount: Number(cells[columnIndex["No. of Satellites"]]),
     };
   });
+}
 
-  const filtered = rows.filter(
-    (row) =>
-      row.horizontalAccuracyMeters <= filters.maximumHorizontalAccuracyMeters &&
-      row.horizontalDilutionOfPrecision <= filters.maximumHorizontalDilutionOfPrecision &&
-      row.satellites >= filters.minimumSatellites,
-  );
-
-  if (!filtered.length) throw new Error("No rows passed quality filters");
-
-  const groups = new Map();
-  for (const row of filtered) {
-    if (!groups.has(row.time)) groups.set(row.time, []);
-    groups.get(row.time).push(row);
-  }
-
-  const collapsed = [...groups.entries()].map(([time, group]) => ({
-    time,
-    speed: mean(group.map((row) => row.speed)),
-    latitude: mean(group.map((row) => row.latitude)),
-    longitude: mean(group.map((row) => row.longitude)),
-  }));
-
-  const output = [
-    "time,speed,latitude,longitude",
-    ...collapsed.map((row) => `${row.time},${row.speed},${row.latitude},${row.longitude}`),
+function serializeCsv(csvRows) {
+  return [
+    "time,speed,lat,lon",
+    ...csvRows.map((csvRow) => `${csvRow.time},${csvRow.speed},${csvRow.lat},${csvRow.lon}`),
   ].join("\n");
+}
 
-  return new File([`${output}\n`], file.name, {
-    type: "text/csv",
-    lastModified: file.lastModified,
-  });
+function collapseDuplicateTimestamps(csvRows) {
+  const rowsByTimestamp = new Map();
+  for (const csvRow of csvRows) {
+    if (!rowsByTimestamp.has(csvRow.time)) rowsByTimestamp.set(csvRow.time, []);
+    rowsByTimestamp.get(csvRow.time).push(csvRow);
+  }
+  return [...rowsByTimestamp.entries()].map(([time, rowsForTimestamp]) => ({
+    time,
+    speed: mean(rowsForTimestamp.map((csvRow) => csvRow.speed)),
+    lat: mean(rowsForTimestamp.map((csvRow) => csvRow.lat)),
+    lon: mean(rowsForTimestamp.map((csvRow) => csvRow.lon)),
+  }));
+}
+
+export async function normalizeGpsCsvFile(gpsCsvFile, csvQualityFilters) {
+  const filteredRows = filterByQuality(parseGpsCsv(await gpsCsvFile.text()), csvQualityFilters);
+  if (!filteredRows.length) throw new Error("No rows passed quality filters");
+  return new File(
+    [`${serializeCsv(collapseDuplicateTimestamps(filteredRows))}\n`],
+    gpsCsvFile.name,
+    {
+      type: "text/csv",
+      lastModified: gpsCsvFile.lastModified,
+    },
+  );
 }

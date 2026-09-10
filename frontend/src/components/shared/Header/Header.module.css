@@ -1,3 +1,31 @@
+.navTab {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--black);
+  border: 1px solid var(--white);
+  color: var(--white);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.navTab:hover {
+  background: var(--black);
+  border: 1px solid white;
+  color: white;
+}
+
+.navTabActive {
+  background: var(--white);
+  border: 1px solid var(--black);
+  color: var(--black);
+}
+
+.navTabActive:hover {
+  background: white;
+  border: 1px solid black;
+  color: black;
+}
+
 .header {
   position: fixed;
   top: 0;
@@ -10,7 +38,7 @@
   color: var(--white);
 }
 
-.inner {
+.bar {
   width: 100%;
   padding: 16px 24px;
   display: flex;
@@ -19,82 +47,12 @@
   transition: padding-right 0.2s ease;
 }
 
-.innerShifted {
+.barShiftedWithAnalysisSidebar {
   padding-right: 50vw;
 }
 
-.brand {
-  font-size: 24px;
-}
-
-.accent {
-  color: var(--red);
-  font-weight: 800;
-}
-
-.tabs {
+.navTabs {
   display: flex;
   gap: 12px;
   margin-right: auto;
-}
-
-.tab {
-  padding: 6px 8px;
-  border-radius: 8px;
-  border: solid 1px var(--white);
-  text-decoration: none;
-  font-weight: 600;
-  color: var(--white);
-}
-
-.tab:hover {
-  background: black;
-  border: solid 1px white;
-  color: white;
-}
-
-.active {
-  background: var(--white);
-  border: solid 1px var(--black);
-  color: var(--black);
-}
-
-.active:hover {
-  background: white;
-  border: solid 1px black;
-  color: black;
-}
-
-.toolbarBtn {
-  padding: 6px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--red);
-  background: var(--white);
-  color: var(--red);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.toolbarBtn:hover {
-  background: white;
-  border: 1px solid red;
-  color: red;
-}
-
-.toolbarBtnActive {
-  padding: 6px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--white);
-  background: var(--red);
-  color: var(--white);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.toolbarBtnActive:hover {
-  background: red;
-  border: 1px solid white;
-  color: white;
 }

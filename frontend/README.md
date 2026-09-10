@@ -1,27 +1,43 @@
-# React + Vite
+# ASP Profiler Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend for the ASP Profiler application.
 
-Currently, two official plugins are available:
+## Requirements
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Node.js
+- npm
 
-## React Compiler
+## Installation
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+```
 
-## Expanding the ESLint configuration
+## Development
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm run dev
+```
 
-## Password gate
+By default, the frontend uses `http://localhost:8000` as the backend URL. Production builds use the API URL from `frontend/.env.production`.
 
-To enable the backend-backed password gate:
+## Build
 
-1. Copy `backend/.env.example` to `backend/.env`.
-2. Set `APP_PASSWORD` and `APP_SESSION_SECRET`.
-3. Make sure `APP_CORS_ORIGINS` includes your frontend origin.
-4. Restart the backend after changing the value.
+```bash
+npm run build
+```
 
-The frontend now logs in against the backend and stores the session in an `HttpOnly` cookie.
+## Tests
+
+```bash
+npm run test
+npm run test:coverage
+```
+
+## Code Quality
+
+```bash
+npm run lint
+npm run lint:fix
+npm run format
+```

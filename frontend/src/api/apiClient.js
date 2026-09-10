@@ -1,27 +1,17 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
-export async function request(path, options) {
-  const headers = new Headers(options?.headers || {});
-  const isFormData = options?.body instanceof FormData;
-
-  if (!isFormData && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  const response = await fetch(`${API_BASE}${path}`, {
+export async function apiRequest(endpointPath, requestOptions) {
+  const apiResponse = await fetch(`${API_BASE_URL}${endpointPath}`, {
     credentials: "include",
-    headers,
-    ...options,
+    ...requestOptions,
   });
 
-  if (!response.ok) {
-    const text = await response.text();
-    const error = new Error(text || `Request failed: ${response.status}`);
-    error.status = response.status;
-    throw error;
+  if (!apiResponse.ok) {
+    const errorText = await apiResponse.text();
+    const apiError = new Error(errorText);
+    apiError.status = apiResponse.status;
+    throw apiError;
   }
 
-  const contentType = response.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) return response.json();
-  return response.text();
+  return apiResponse.json();
 }

@@ -1,0 +1,14 @@
+.analysisViewOptionsToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 0;
+}
+
+.analysisViewOptionsToolbarFieldsRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  text-align: left;
+}

@@ -1,17 +1,18 @@
 import styles from "./Button.module.css";
 
-export default function Button({
-  variant = "primary",
-  type = "button",
-  className,
-  children,
-  ...props
-}) {
+const BUTTON_VARIANT_CLASS_NAMES = {
+  primary: styles.primary,
+  primaryOutline: styles.primaryOutline,
+  ghost: styles.ghost,
+};
+
+export default function Button({ buttonVariant, buttonClassName, children, ...buttonProps }) {
+  const buttonVariantClassName = BUTTON_VARIANT_CLASS_NAMES[buttonVariant] || styles.primary;
+
   return (
     <button
-      type={type}
-      className={`${styles.btn} ${styles[variant]}${className ? ` ${className}` : ""}`}
-      {...props}
+      className={`${styles.button} ${buttonVariantClassName}${buttonClassName ? ` ${buttonClassName}` : ""}`}
+      {...buttonProps}
     >
       {children}
     </button>

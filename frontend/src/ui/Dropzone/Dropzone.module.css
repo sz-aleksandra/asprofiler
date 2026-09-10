@@ -1,0 +1,24 @@
+.area {
+  border: 1px dashed var(--black);
+  border-radius: 16px;
+  padding: 72px;
+  cursor: pointer;
+  user-select: none;
+  text-align: center;
+}
+
+.area > * {
+  pointer-events: none;
+}
+
+.area:hover {
+  border: 1px solid;
+}
+
+.areaDragOver {
+  border: 1px solid;
+}
+
+.hiddenFileInput {
+  display: none;
+}

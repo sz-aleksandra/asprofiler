@@ -30,8 +30,13 @@ frontend/.env
 
 # Python
 __pycache__/
+.pytest_cache/
 *.pyc
 .venv/
 backend/data/
+
+# Coverage / test artifacts
+coverage/
+.coverage
 
 dont_forget.txt

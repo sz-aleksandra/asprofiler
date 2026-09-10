@@ -1,0 +1,25 @@
+user_lib <- file.path(Sys.getenv("USERPROFILE"), "R", "win-library", "4.6")
+.libPaths(c(user_lib, .libPaths()))
+suppressMessages(library(dplyr))
+suppressMessages(library(readr))
+suppressMessages(library(InSituASProfile))
+
+all_args <- commandArgs(trailingOnly = FALSE)
+file_arg <- sub("^--file=", "", all_args[grepl("^--file=", all_args)])
+script_dir <- if (length(file_arg) > 0) dirname(normalizePath(file_arg)) else getwd()
+csv_path <- file.path(script_dir, "data", "ishoi_data.csv")
+x <- read_csv(csv_path, show_col_types = FALSE)
+x <- x[!is.na(x$acc), c("speed", "acc")]
+cat("rows_after_na_drop:", nrow(x), "\n")
+
+prepare_data(x, print_plot = FALSE)
+get_AS_Profile(print_plot_regression_line = FALSE, print_AS_plot = FALSE, ci_outlier_detection = TRUE)
+
+cat("=== ISHOI (ishoi_data.csv) ===\n")
+cat("A0:                    ", a0, "\n")
+cat("vmax:                  ", vmax, "\n")
+cat("R.squared:             ", r.square, "\n")
+cat("n_initial:             ", nrow(as_insitu_initial_lm), "\n")
+cat("n_clean:               ", nrow(as_insitu_clean), "\n")
+cat("intercept (raw):       ", coef(summary_as)[1,1], "\n")
+cat("slope:                 ", coef(summary_as)[2,1], "\n")

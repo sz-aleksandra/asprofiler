@@ -1,22 +1,26 @@
 import { useState } from "react";
-import Header from "../Header/Header";
-import Footer from "../Footer/Footer";
 import { Outlet } from "react-router-dom";
-import { AnalysisLayoutContext } from "./AnalysisLayoutContext";
+
+import { AnalysisSidebarOpenContext } from "../../../hooks/shared/useAnalysisSidebarOpen";
+import Footer from "../Footer/Footer";
+import Header from "../Header/Header";
+
 import styles from "./Layout.module.css";
 
 export default function Layout() {
-  const [analysisToolsOpen, setAnalysisToolsOpen] = useState(false);
+  const [isAnalysisSidebarOpen, setIsAnalysisSidebarOpen] = useState(false);
 
   return (
-    <AnalysisLayoutContext.Provider value={{ analysisToolsOpen, setAnalysisToolsOpen }}>
-      <div className={styles.shell}>
+    <AnalysisSidebarOpenContext.Provider
+      value={{ isAnalysisSidebarOpen, setIsAnalysisSidebarOpen }}
+    >
+      <div className={styles.layout}>
         <Header />
-        <main className={styles.content}>
+        <div className={styles.outlet}>
           <Outlet />
-        </main>
+        </div>
         <Footer />
       </div>
-    </AnalysisLayoutContext.Provider>
+    </AnalysisSidebarOpenContext.Provider>
   );
 }

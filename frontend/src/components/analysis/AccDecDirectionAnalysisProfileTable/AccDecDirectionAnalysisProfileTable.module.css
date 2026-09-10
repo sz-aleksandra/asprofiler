@@ -1,0 +1,58 @@
+.accDecDirectionAnalysisProfileTable {
+  border-radius: 16px;
+  background: white;
+  padding: 8px;
+  color: var(--black);
+}
+
+.tableSelectionToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid currentColor;
+}
+
+.allToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.row {
+  display: grid;
+  grid-template-columns:
+    44px minmax(206px, 1.22fr) repeat(6, minmax(140px, 1fr)) 88px;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--black);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.headerRow {
+  font-weight: 600;
+  color: var(--black);
+}
+
+.checkboxCell,
+.colorCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fileNameCell {
+  min-width: 0;
+}
+
+.fitCell,
+.metricCell {
+  color: var(--black);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}

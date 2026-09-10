@@ -1,53 +1,44 @@
-import { useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { useAnalysisLayout } from "../Layout/AnalysisLayoutContext";
-import styles from "./Header.module.css";
 
+import { useAnalysisSidebarOpen } from "../../../hooks/shared/useAnalysisSidebarOpen";
+import Button from "../../../ui/Button/Button";
+import Brand from "../Brand/Brand";
+
+import styles from "./Header.module.css";
+function getTabClassName({ isActive: isTabActive }) {
+  return `${styles.navTab} ${isTabActive ? styles.navTabActive : ""}`;
+}
 export default function Header() {
   const location = useLocation();
-  const showToolbarButton = location.pathname === "/analysis";
-  const { analysisToolsOpen, setAnalysisToolsOpen } = useAnalysisLayout();
-  const toolbarOpen = showToolbarButton && analysisToolsOpen;
-
-  useEffect(() => {
-    if (!showToolbarButton) setAnalysisToolsOpen(false);
-  }, [showToolbarButton, setAnalysisToolsOpen]);
-
+  const showAnalysisSidebarButton = location.pathname === "/analysis";
+  const { isAnalysisSidebarOpen, setIsAnalysisSidebarOpen } = useAnalysisSidebarOpen();
+  const isAnalysisSidebarButtonActive = showAnalysisSidebarButton && isAnalysisSidebarOpen;
   return (
-    <header className={styles.header}>
+    <div className={styles.header}>
       <div
-        className={`${styles.inner} ${toolbarOpen && showToolbarButton ? styles.innerShifted : ""}`}
+        className={`${styles.bar} ${isAnalysisSidebarButtonActive ? styles.barShiftedWithAnalysisSidebar : ""}`}
       >
-        <div className={styles.brand}>
-          <span className={styles.accent}>AS</span>
-          Profiler
-        </div>
+        <Brand />
 
-        <nav className={styles.tabs}>
-          <NavLink
-            to="/about"
-            className={({ isActive }) => `${styles.tab} ${isActive ? styles.active : ""}`}
-          >
+        <div className={styles.navTabs}>
+          <NavLink className={getTabClassName} to="/about">
             About
           </NavLink>
-          <NavLink
-            to="/files"
-            className={({ isActive }) => `${styles.tab} ${isActive ? styles.active : ""}`}
-          >
+          <NavLink className={getTabClassName} to="/files">
             Files
           </NavLink>
-        </nav>
+        </div>
 
-        {showToolbarButton && (
-          <button
-            className={toolbarOpen ? styles.toolbarBtnActive : styles.toolbarBtn}
+        {showAnalysisSidebarButton && (
+          <Button
             type="button"
-            onClick={() => setAnalysisToolsOpen((open) => !open)}
+            buttonVariant={isAnalysisSidebarButtonActive ? "primary" : "primaryOutline"}
+            onClick={() => setIsAnalysisSidebarOpen((isOpen) => !isOpen)}
           >
             Sidebar
-          </button>
+          </Button>
         )}
       </div>
-    </header>
+    </div>
   );
 }

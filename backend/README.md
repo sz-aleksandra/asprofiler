@@ -1,31 +1,52 @@
-# Backend (FastAPI)
+# ASP Profiler Backend
 
-## Setup
+Backend API for the ASP Profiler application.
+
+## Requirements
+
+- Python
+- pip
+
+## Installation
 
 ```bash
-cd backend
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Run (dev)
+## Configuration
 
-```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+Copy `backend/.env.example` to `backend/.env` and set:
+
+```env
+APP_PASSWORD=your-password
+APP_SESSION_SECRET=your-long-random-secret
 ```
 
-## Auth setup
+`APP_CORS_ORIGINS` must include the frontend origin. For local development, use `http://localhost:5173`. For production, use `https://app.asprofiler.click`.
 
-1. Copy `backend/.env.example` to `backend/.env`.
-2. Set `APP_PASSWORD` and `APP_SESSION_SECRET`.
-3. Adjust `APP_CORS_ORIGINS` if your frontend runs from another origin.
+Session lifetime and cookie behavior can be overridden with `APP_SESSION_TTL_SECONDS`, `APP_COOKIE_SECURE`, and `APP_COOKIE_SAMESITE`. For local development, use `APP_COOKIE_SECURE=False` and `APP_COOKIE_SAMESITE=lax`. For production, use `APP_COOKIE_SECURE=True` and `APP_COOKIE_SAMESITE=none`.
 
-The backend uses a signed `HttpOnly` cookie. On localhost it defaults to a non-secure `SameSite=Lax` cookie, and for non-local hosts it defaults to `Secure` with `SameSite=None`.
+## Development
 
-## Endpoints
+```bash
+uvicorn app.main:app --reload --env-file .env --host 0.0.0.0 --port 8000
+```
 
-- `GET /health`
-- `GET /auth/session`
-- `POST /auth/login`
-- `POST /analyze-files`
+## Tests
+
+```bash
+python -m pytest
+```
+
+Coverage is configured in `pytest.ini` and is printed in the terminal after the test run.
+
+## Reference Validation
+
+The reference scripts compare ASP Profiler results with the [`InSituASProfile`](https://github.com/LasseIshoi/InSituASProfile) R package on `tests/reference/data/ishoi_data.csv`.
+
+```bash
+python tests/reference/run_asprofiler_on_ishoi_data.py
+Rscript tests/reference/run_ishoi_on_ishoi_data.R
+```

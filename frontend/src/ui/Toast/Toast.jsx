@@ -1,21 +1,26 @@
 import { useEffect } from "react";
+
+import Button from "../Button/Button";
+
 import styles from "./Toast.module.css";
-
-export default function Toast({ message, type = "info", onClose, duration = 3000 }) {
+const TOAST_VARIANT_CLASS_NAMES = {
+  success: styles.success,
+  error: styles.error,
+};
+export default function Toast({ toastMessage, onCloseToast, toastVariant }) {
   useEffect(() => {
-    if (!message) return;
-    const t = setTimeout(onClose, duration);
-    return () => clearTimeout(t);
-  }, [message, duration, onClose]);
-
-  if (!message) return null;
-
+    if (!toastMessage) return;
+    const autoCloseTimeoutId = setTimeout(onCloseToast, 3000);
+    return () => clearTimeout(autoCloseTimeoutId);
+  }, [toastMessage, onCloseToast]);
+  if (!toastMessage) return null;
+  const toastVariantClassName = TOAST_VARIANT_CLASS_NAMES[toastVariant] || "";
   return (
-    <div className={`${styles.toast} ${styles[type]}`} role="status">
-      <span className={styles.text}>{message}</span>
-      <button className={styles.close} onClick={onClose} aria-label="Close">
+    <div className={`${styles.toast} ${toastVariantClassName}`}>
+      <span className={styles.message}>{toastMessage}</span>
+      <Button type="button" buttonVariant="ghost" onClick={onCloseToast}>
         x
-      </button>
+      </Button>
     </div>
   );
 }

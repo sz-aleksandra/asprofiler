@@ -1,0 +1,50 @@
+.text {
+  font-weight: 600;
+  color: var(--black);
+}
+
+.headerLabel {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.helpIcon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--black);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+}
+
+.helpIcon:hover .tooltipLines {
+  opacity: 1;
+}
+
+.tooltipLines {
+  width: 330px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--black);
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+
+.tooltipLine {
+  display: block;
+}

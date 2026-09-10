@@ -1,0 +1,26 @@
+.speedStatValue {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.earlyLateCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.2;
+}
+
+.earlyValue {
+  color: inherit;
+}
+
+.lateValue {
+  color: #555;
+}
+
+.ratioValue {
+  color: #888;
+  font-style: italic;
+  font-size: 0.9em;
+}

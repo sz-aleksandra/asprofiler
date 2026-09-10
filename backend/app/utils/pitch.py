@@ -1,134 +1,165 @@
 from __future__ import annotations
 
-import math
+from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
+from scipy.spatial import ConvexHull
 
-PITCH_LENGTH_METERS = 105.0
+Zone = Literal["left", "middle", "right"]
+
+
+class PitchProjectionError(ValueError):
+    pass
+
+
+_PITCH_LENGTH = 105.0
+_EARTH_RADIUS = 6_371_000.0
+
+
+@dataclass
+class PitchProjectionContext:
+    origin_lat_radians: float
+    origin_lon_radians: float
+    axis_x: float
+    axis_y: float
+    x_offset: float
+    y_offset: float
+
+
+def find_fast_points(
+    lats: np.ndarray,
+    lons: np.ndarray,
+    speeds: np.ndarray,
+    min_speed,
+) -> tuple[np.ndarray, np.ndarray]:
+    mask = speeds >= min_speed
+    return lats[mask], lons[mask]
+
+
+def _find_minimum_bounding_rectangle(
+    pitch_coordinates: np.ndarray,
+) -> tuple[float, float, float, float]:
+    convex_hull_points = pitch_coordinates[ConvexHull(pitch_coordinates).vertices]
+    convex_hull_edges = np.diff(np.vstack([convex_hull_points, convex_hull_points[:1]]), axis=0)
+    edge_directions = convex_hull_edges / np.hypot(
+        convex_hull_edges[:, 0], convex_hull_edges[:, 1]
+    )[:, None]
+
+    minimum_area = np.inf
+    minimum_rectangle = None
+    for direction in edge_directions:
+        perpendicular_direction = np.array([-direction[1], direction[0]])
+        along_projection = pitch_coordinates @ direction
+        perpendicular_projection = pitch_coordinates @ perpendicular_direction
+        min_along_projection, max_along_projection = (
+            along_projection.min(),
+            along_projection.max(),
+        )
+        min_perpendicular_projection, max_perpendicular_projection = (
+            perpendicular_projection.min(),
+            perpendicular_projection.max(),
+        )
+        width = max_along_projection - min_along_projection
+        height = max_perpendicular_projection - min_perpendicular_projection
+        rectangle_area = width * height
+        if rectangle_area < minimum_area:
+            minimum_area = rectangle_area
+            rectangle_center = (
+                ((min_along_projection + max_along_projection) / 2) * direction
+                + ((min_perpendicular_projection + max_perpendicular_projection) / 2)
+                * perpendicular_direction
+            )
+            long_axis = direction if width >= height else perpendicular_direction
+            minimum_rectangle = (
+                float(long_axis[0]),
+                float(long_axis[1]),
+                float(rectangle_center[0]),
+                float(rectangle_center[1]),
+            )
+    return minimum_rectangle
+
+
+def compute_pitch_projection_context(
+    fast_lats: np.ndarray,
+    fast_lons: np.ndarray,
+) -> PitchProjectionContext:
+    if len(fast_lats) < 3:
+        raise PitchProjectionError(
+            "Not enough GPS points above 3.0 m/s to estimate pitch orientation"
+        )
+
+    lat_radians = np.radians(fast_lats)
+    lon_radians = np.radians(fast_lons)
+    origin_lat_radians = float(lat_radians.mean())
+    origin_lon_radians = float(lon_radians.mean())
+    cos_origin_lat = np.cos(origin_lat_radians)
+
+    east_offset = (lon_radians - origin_lon_radians) * cos_origin_lat * _EARTH_RADIUS
+    north_offset = (lat_radians - origin_lat_radians) * _EARTH_RADIUS
+    pitch_coordinates = np.column_stack([east_offset, north_offset])
+
+    axis_x, axis_y, center_x, center_y = _find_minimum_bounding_rectangle(pitch_coordinates)
+    center_along = center_x * axis_x + center_y * axis_y
+    center_perpendicular = -center_x * axis_y + center_y * axis_x
+
+    return PitchProjectionContext(
+        origin_lat_radians=origin_lat_radians,
+        origin_lon_radians=origin_lon_radians,
+        axis_x=axis_x,
+        axis_y=axis_y,
+        x_offset=float(_PITCH_LENGTH / 2 - center_along),
+        y_offset=float(-center_perpendicular),
+    )
 
 
 def project_pitch_points(
-    latitudes: list[float | None] | None,
-    longitudes: list[float | None] | None,
-    speeds: np.ndarray,
-    minimum_speed: float,
-) -> list[dict] | None:
-    if not latitudes or not longitudes:
-        return None
+    lats: np.ndarray,
+    lons: np.ndarray,
+    projection_context: PitchProjectionContext,
+) -> tuple[np.ndarray, np.ndarray]:
+    cos_origin_lat = np.cos(projection_context.origin_lat_radians)
+    lat_radians = np.radians(lats)
+    lon_radians = np.radians(lons)
+    east_offset = (
+        lon_radians - projection_context.origin_lon_radians
+    ) * cos_origin_lat * _EARTH_RADIUS
+    north_offset = (lat_radians - projection_context.origin_lat_radians) * _EARTH_RADIUS
 
-    points = []
-    for index, (latitude, longitude) in enumerate(zip(latitudes, longitudes)):
-        if latitude is None or longitude is None:
-            continue
-        if not math.isfinite(float(latitude)) or not math.isfinite(float(longitude)):
-            continue
-        points.append(
-            {
-                "index": index,
-                "speed": float(speeds[index]) if index < len(speeds) else 0.0,
-                "latitude": float(latitude),
-                "longitude": float(longitude),
-            }
-        )
-
-    if len(points) < 2:
-        return None
-
-    fast_points = [point for point in points if point["speed"] > minimum_speed]
-    if len(fast_points) < 10:
-        fast_points = points
-
-    lat0 = sum(math.radians(point["latitude"]) for point in fast_points) / len(fast_points)
-    lon0 = sum(math.radians(point["longitude"]) for point in fast_points) / len(fast_points)
-
-    projected = []
-    for point in points:
-        lat_rad = math.radians(point["latitude"])
-        lon_rad = math.radians(point["longitude"])
-        projected.append(
-            {
-                "index": point["index"],
-                "x": (lon_rad - lon0) * math.cos(lat0) * 6371000,
-                "y": (lat_rad - lat0) * 6371000,
-                "speed": point["speed"],
-            }
-        )
-
-    fast_projected = [point for point in projected if point["speed"] > minimum_speed]
-    if len(fast_projected) < 10:
-        fast_projected = projected
-
-    xmin = min(point["x"] for point in fast_projected)
-    xmax = max(point["x"] for point in fast_projected)
-    x_shift = 0.0
-    if xmin < -(PITCH_LENGTH_METERS / 2):
-        x_shift += -(PITCH_LENGTH_METERS / 2) - xmin
-    if xmax + x_shift > PITCH_LENGTH_METERS / 2:
-        x_shift += PITCH_LENGTH_METERS / 2 - (xmax + x_shift)
-
-    return [{"index": point["index"], "x": point["x"] + x_shift + (PITCH_LENGTH_METERS / 2)} for point in projected]
+    x = (
+        east_offset * projection_context.axis_x
+        + north_offset * projection_context.axis_y
+        + projection_context.x_offset
+    )
+    y = (
+        -east_offset * projection_context.axis_y
+        + north_offset * projection_context.axis_x
+        + projection_context.y_offset
+    )
+    return x, y
 
 
-def zone_from_x(x_value: float | None) -> str | None:
-    if x_value is None or not math.isfinite(float(x_value)):
-        return None
-    third = PITCH_LENGTH_METERS / 3
-    if x_value < third:
-        return "left"
-    if x_value < third * 2:
-        return "middle"
-    return "right"
+def build_pitch_zone_labels(pitch_x_values: np.ndarray) -> np.ndarray:
+    zones = np.empty(pitch_x_values.shape, dtype=object)
+    zone_width = _PITCH_LENGTH / 3
+    left_zone_mask = pitch_x_values < zone_width
+    right_zone_mask = pitch_x_values >= 2 * zone_width
+    middle_zone_mask = ~left_zone_mask & ~right_zone_mask
+    zones[left_zone_mask] = "left"
+    zones[middle_zone_mask] = "middle"
+    zones[right_zone_mask] = "right"
+    return zones
 
 
-def build_window_sample_mask(
-    sample_count: int,
-    windows: list[tuple[int, int]] | None,
-) -> np.ndarray | None:
-    if sample_count <= 0 or not windows:
-        return None
-
+def build_window_mask(sample_count, windows: list[tuple[int, int]]) -> np.ndarray:
     mask = np.zeros(sample_count, dtype=bool)
     for start_index, end_index in windows:
-        safe_start = max(0, int(start_index))
-        safe_end = min(sample_count - 1, int(end_index))
-        if safe_start > safe_end:
-            continue
-        mask[safe_start : safe_end + 1] = True
+        mask[start_index : end_index + 1] = True
     return mask
 
 
-def build_zone_sample_mask(
-    zone_by_index: dict[int, str | None],
-    effective_mask: np.ndarray,
-    zone_name: str,
-    minimum_contiguous_samples: int = 2,
+def build_zone_mask(
+    zones: np.ndarray,
+    zone_name: Zone,
 ) -> np.ndarray:
-    zone_mask = np.array(
-        [
-            bool(effective_mask[index]) and zone_by_index.get(index) == zone_name
-            for index in range(len(effective_mask))
-        ],
-        dtype=bool,
-    )
-    if minimum_contiguous_samples <= 1 or len(zone_mask) == 0:
-        return zone_mask
-
-    filtered_zone_mask = np.zeros(len(zone_mask), dtype=bool)
-    run_start = None
-    for index, in_zone in enumerate(zone_mask):
-        if in_zone:
-            if run_start is None:
-                run_start = index
-            continue
-        if run_start is not None:
-            run_length = index - run_start
-            if run_length >= minimum_contiguous_samples:
-                filtered_zone_mask[run_start:index] = True
-            run_start = None
-
-    if run_start is not None:
-        run_length = len(zone_mask) - run_start
-        if run_length >= minimum_contiguous_samples:
-            filtered_zone_mask[run_start:] = True
-
-    return filtered_zone_mask
+    return zones == zone_name

@@ -1,0 +1,7 @@
+.perSelectedFileAnalysisParamsFormPanel {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  text-align: left;
+  padding: 10px 14px 14px 54px;
+}

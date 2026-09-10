@@ -1,21 +1,30 @@
-.controls {
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-  border: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin-top: 14px;
+.analysisSidebarOverlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--black) 10%, transparent);
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 20;
 }
 
-.section {
-  display: flex;
-  flex-direction: column;
+.analysisSidebarPanel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(50vw, 900px);
+  min-width: 640px;
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--black);
+  color: var(--white);
+  border-left: 1px solid var(--white);
+  z-index: 30;
 }
 
-.sectionTitle {
+.analysisSidebarTitle {
+  margin: 14px 0 0;
   padding: 12px 14px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--white);
 }

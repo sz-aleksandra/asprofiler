@@ -1,87 +1,27 @@
-.table {
-  border: none;
-  border-radius: 0;
+.filesSelectionTable {
   overflow: hidden;
+  color: var(--black);
 }
 
-.toolbar {
+.tableSelectionToolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px;
-  border-bottom: 1px solid var(--black);
-  background: transparent;
+  border-bottom: 1px solid currentColor;
 }
 
-.toolbarLeft {
+.allToggle {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 6px;
+  font-weight: 600;
 }
 
 .actionsGroup {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.selectAll {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  color: var(--black);
-}
-
-.count {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  color: var(--black);
-}
-
-.primaryBtn {
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--red);
-  background: var(--white);
-  color: var(--red);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.primaryBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.primaryBtn:hover {
-  background: white;
-  color: red;
-  border: 1px solid red;
-}
-
-.dangerBtn {
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--white);
-  background: var(--red);
-  color: var(--white);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.dangerBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.dangerBtn:hover {
-  background: red;
-  color: white;
-  border: 1px solid white;
 }
 
 .row {
@@ -91,95 +31,53 @@
   align-items: center;
   padding: 12px 14px;
   border-bottom: 1px solid var(--black);
-  background: transparent;
+}
+
+.block:last-of-type .row {
+  border-bottom: none;
+}
+
+.headerRow {
+  font-weight: 600;
+  color: var(--black);
+}
+
+.checkboxCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fileNameCell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sizeCell {
+  color: var(--black);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.actionsCell {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.block:last-of-type .expandedParams {
+  border-bottom: none;
 }
 
 .rowExpanded {
   border-bottom: none;
 }
 
-.head {
-  font-weight: 600;
-  color: var(--black);
-}
-
-.cellCheckbox {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.cellName {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.cellSize {
-  color: var(--black);
-  text-align: left;
-  font-variant-numeric: tabular-nums;
-}
-
-.cellActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.fileBlock:last-of-type .row {
-  border-bottom: none;
-}
-
-.fileBlock:last-of-type {
-  --panel-border-bottom: none;
-}
-
-.linkPrimary {
-  background: var(--white);
-  border: 1px solid var(--red);
-  border-radius: 6px;
-  color: var(--red);
-  padding: 8px 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.linkPrimary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.linkPrimary:hover {
-  background: white;
-  color: red;
-  border: 1px solid red;
-}
-
-.linkDanger {
-  background: var(--red);
-  border: 1px solid var(--white);
-  border-radius: 6px;
-  color: var(--white);
-  padding: 8px 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.linkDanger:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.linkDanger:hover {
-  background: red;
-  color: white;
-  border: 1px solid white;
+.expandedParams {
+  border-bottom: 1px solid var(--black);
 }
 
 .emptyRow {
   padding: 12px 14px;
   color: var(--black);
-  background: transparent;
 }

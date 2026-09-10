@@ -1,0 +1,90 @@
+.chosenAnalysisPointsTable {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  color: var(--white);
+}
+
+.tableSelectionToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid currentColor;
+}
+
+.allToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  text-align: left;
+}
+
+.rows {
+  overflow-y: auto;
+  max-height: 600px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 44px 1fr 120px 120px 120px 120px;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--white);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.headerRow {
+  font-weight: 600;
+  color: var(--white);
+}
+
+.checkboxCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sortButton {
+  width: 100%;
+  text-align: left;
+}
+
+.actionsCell {
+  display: flex;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.emptyMessage {
+  padding: 12px 14px;
+  color: var(--white);
+  border-bottom: 1px solid var(--white);
+}
+
+.fileNameCell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--white);
+}
+
+.valueCell {
+  text-align: left;
+  color: var(--white);
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+}

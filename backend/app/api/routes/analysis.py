@@ -1,83 +1,94 @@
 import json
-from dataclasses import dataclass
 from io import StringIO
 
 import numpy as np
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel
 
-from app.api.deps import require_authorized_user
-from app.schemas.analysis import AnalyzeParameters, AnalyzeResultsResponse, PreprocessingParameters
-from app.services.analysis import build_as_profile, resolve_file_parameters
-from app.services.preprocessing import load_series_stream, preprocess_series
+from app.services.auth.deps import require_auth
+from app.services.analysis.schemas import AnalysisParams, AnalysisResults, PreprocessingParams
+from app.services.analysis.orchestrator import build_analysis
+from app.services.analysis.modules.preprocessing import (
+    PreprocessingError,
+    load_gps_series_stream,
+    preprocess_series,
+)
+from app.utils.pitch import (
+    PitchProjectionError,
+    compute_pitch_projection_context,
+    find_fast_points,
+)
 
-router = APIRouter()
-
-
-@dataclass
-class _AnalysisRequest:
-    default_parameters: AnalyzeParameters
-    per_file_parameters: dict[str, dict]
-    preprocessing_parameters: PreprocessingParameters
-
-
-def _parse_parameters_json(parameters_json: str) -> _AnalysisRequest:
-    try:
-        raw = json.loads(parameters_json or "{}")
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=400, detail="Invalid parameters_json") from exc
-
-    return _AnalysisRequest(
-        default_parameters=AnalyzeParameters(**(raw.get("default") or {})),
-        per_file_parameters=raw.get("per_file") or {},
-        preprocessing_parameters=PreprocessingParameters(
-            **(raw.get("preprocessing_parameters") or {})
-        ),
-    )
+router = APIRouter(prefix="/analysis")
 
 
-@router.post("/analyze-files", response_model=AnalyzeResultsResponse)
+class _Params(BaseModel):
+    per_file_params: dict[str, AnalysisParams]
+    preprocessing_params: PreprocessingParams
+
+
+def _parse_params(raw_params: str) -> _Params:
+    return _Params.model_validate(json.loads(raw_params))
+
+
+@router.post("/analyze", response_model=AnalysisResults)
 async def analyze_files(
     files: list[UploadFile] = File(...),
-    parameters_json: str = File("{}"),
-    _auth=Depends(require_authorized_user),
+    params: str = Form(...),
+    _authenticated=Depends(require_auth),
 ):
-    if not files:
-        raise HTTPException(status_code=400, detail="No files selected")
+    parsed_params = _parse_params(params)
 
-    analysis_request = _parse_parameters_json(parameters_json)
-
-    results = []
-    for uploaded in files:
-        name = uploaded.filename or "unnamed.csv"
-        parameters = resolve_file_parameters(
-            name,
-            analysis_request.default_parameters,
-            analysis_request.per_file_parameters,
-        )
+    file_entries: list[dict] = []
+    for uploaded_file in files:
+        file_name = uploaded_file.filename
+        if file_name not in parsed_params.per_file_params:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Missing analysis params for file: {file_name}",
+            )
+        file_params = parsed_params.per_file_params[file_name]
         try:
-            content = await uploaded.read()
-            text = content.decode("utf-8-sig")
-            absolute_times, raw_speeds, raw_latitudes, raw_longitudes = load_series_stream(StringIO(text))
+            content = await uploaded_file.read()
+            absolute_times, speeds, lats, lons = load_gps_series_stream(
+                StringIO(content.decode("utf-8-sig"))
+            )
             series = preprocess_series(
                 absolute_times,
-                raw_speeds,
-                raw_latitudes,
-                raw_longitudes,
-                analysis_request.preprocessing_parameters,
+                speeds,
+                lats,
+                lons,
+                parsed_params.preprocessing_params,
             )
-            profile = build_as_profile(
-                np.array(series.relative_times),
-                np.array(series.speeds),
-                np.array(series.accelerations),
-                series.absolute_times,
-                series.latitudes,
-                series.longitudes,
-                parameters,
-            )
-            results.append({"name": name, "profile": profile})
-        except HTTPException as exc:
-            results.append({"name": name, "error": str(exc.detail)})
-        except UnicodeDecodeError:
-            results.append({"name": name, "error": "Could not decode CSV as utf-8"})
+            file_entries.append({"file_name": file_name, "params": file_params, "series": series})
+        except PreprocessingError as error:
+            file_entries.append({"file_name": file_name, "error": str(error)})
 
-    return {"ok": True, "results": results}
+    valid_entries = [entry for entry in file_entries if "error" not in entry]
+    if valid_entries:
+        fast_points = [
+            find_fast_points(
+                entry["series"].lats,
+                entry["series"].lons,
+                entry["series"].speeds,
+                min_speed=3.0,
+            )
+            for entry in valid_entries
+        ]
+        try:
+            pitch_context = compute_pitch_projection_context(
+                np.concatenate([point[0] for point in fast_points]),
+                np.concatenate([point[1] for point in fast_points]),
+            )
+        except PitchProjectionError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+    results = []
+    for entry in file_entries:
+        if "error" in entry:
+            results.append({"file_name": entry["file_name"], "error": entry["error"]})
+            continue
+        analysis = build_analysis(entry["series"], entry["params"], pitch_context)
+        results.append({"file_name": entry["file_name"], "analysis": analysis})
+
+    return {"results": results}

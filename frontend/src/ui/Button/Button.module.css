@@ -1,17 +1,3 @@
-.btn {
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 8px 12px;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
 .primary {
   background: var(--red);
   color: var(--white);
@@ -24,28 +10,37 @@
   border: 1px solid white;
 }
 
-.outline {
+.primaryOutline {
   background: var(--white);
   border: 1px solid var(--red);
   color: var(--red);
 }
 
-.outline:hover:not(:disabled) {
+.primaryOutline:hover:not(:disabled) {
   background: white;
   border: 1px solid red;
   color: red;
 }
 
-.secondary {
-  border-radius: 8px;
-  padding: 6px 8px;
+.ghost {
   background: transparent;
-  border: 1px solid var(--white);
-  color: var(--white);
+  border: 0;
+  padding: 0;
+  border-radius: 0;
+  color: inherit;
+  font-weight: normal;
 }
 
-.secondary:hover:not(:disabled) {
-  background: black;
-  border: 1px solid white;
-  color: white;
+.button {
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 12px;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
