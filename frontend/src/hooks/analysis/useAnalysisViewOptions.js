@@ -30,7 +30,7 @@ export default function useAnalysisViewOptions() {
     "analysis_stats_activity_scope_mode",
     "all",
   );
-  const [analysisProfileMode, setAnalysisProfileMode] = useLocalStorage(
+  const [analysisMode, setAnalysisMode] = useLocalStorage(
     "analysis_acc_dec_profile_mode",
     "accDecSpeedAnalysisProfile",
   );
@@ -60,7 +60,7 @@ export default function useAnalysisViewOptions() {
     setEventPhaseMode,
     statsActivityScopeMode,
     setStatsActivityScopeMode,
-    analysisProfileMode,
-    setAnalysisProfileMode,
+    analysisMode,
+    setAnalysisMode,
   };
 }

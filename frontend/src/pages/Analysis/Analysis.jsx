@@ -47,7 +47,7 @@ export default function Analysis({ analysisState }) {
     secondsToTime(
       analysisViewOptions.timeMode === "relative" ? relativeTimeSeconds : absoluteTimeSeconds,
     );
-  const analysisProfileConfig = getAnalysisProfileConfig(analysisViewOptions.analysisProfileMode);
+  const analysisProfileConfig = getAnalysisProfileConfig(analysisViewOptions.analysisMode);
   const analysisTableConfig = buildAnalysisTableConfig({
     analysisProfileConfig,
     analysisResults,

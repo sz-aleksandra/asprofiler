@@ -79,9 +79,9 @@ export const EVENT_PHASE_OPTIONS = [
   { value: "earlyLate", label: "Phase split" },
 ];
 
-export const ANALYSIS_PROFILE_MODE_OPTIONS = [
-  { value: "accDecSpeedAnalysisProfile", label: "Acceleration-Speed Analysis Profile" },
-  { value: "forceVelocityAnalysisProfile", label: "Force-Velocity Analysis Profile" },
+export const ANALYSIS_MODE_OPTIONS = [
+  { value: "accDecSpeedAnalysisProfile", label: "Acceleration / Deceleration" },
+  { value: "forceVelocityAnalysisProfile", label: "Force" },
 ];
 
 const ACC_DEC_ANALYSIS_PROFILE_CONFIG = {

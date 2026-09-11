@@ -31,8 +31,8 @@ vi.mock("../../hooks/analysis/useAnalysisResultColorsAndVisibility", () => ({
 }));
 
 const analysisViewOptionsStub = {
-  analysisProfileMode: "accDecSpeedAnalysisProfile",
-  setAnalysisProfileMode: () => {},
+  analysisMode: "accDecSpeedAnalysisProfile",
+  setAnalysisMode: () => {},
   timeMode: "relative",
   speedUnitsState: {},
 };
@@ -64,9 +64,9 @@ vi.mock("../../utils/analysis/constants", async () => {
   const actualConstants = await vi.importActual("../../utils/analysis/constants");
   return {
     ...actualConstants,
-    getAnalysisProfileConfig: (analysisProfileMode) => ({
-      isForce: analysisProfileMode === "forceVelocityAnalysisProfile",
-      mode: analysisProfileMode,
+    getAnalysisProfileConfig: (analysisMode) => ({
+      isForce: analysisMode === "forceVelocityAnalysisProfile",
+      mode: analysisMode,
     }),
   };
 });
@@ -137,7 +137,7 @@ beforeEach(() => {
   setIsAnalysisSidebarOpenMock.mockReset();
   isAnalysisSidebarOpenValue = false;
   visibleAnalysisResultsValue = [{ file_name: "a.csv" }];
-  analysisViewOptionsStub.analysisProfileMode = "accDecSpeedAnalysisProfile";
+  analysisViewOptionsStub.analysisMode = "accDecSpeedAnalysisProfile";
   exportAnalysis.mockReset();
 });
 

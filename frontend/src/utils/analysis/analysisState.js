@@ -14,7 +14,7 @@ export function buildAnalysisViewModel(
   colorMap,
   analysisViewOptions,
 ) {
-  const analysisProfileConfig = getAnalysisProfileConfig(analysisViewOptions.analysisProfileMode);
+  const analysisProfileConfig = getAnalysisProfileConfig(analysisViewOptions.analysisMode);
   const speedMultiplier = analysisViewOptions.timeSeriesSpeedUnit === "km/h" ? 3.6 : 1;
 
   const visibleAnalysisResults = analysisResults.filter(

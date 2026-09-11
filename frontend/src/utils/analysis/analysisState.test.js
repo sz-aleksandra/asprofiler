@@ -9,7 +9,7 @@ function analysisResultFromFixture(fileName, analysisOverrides = {}) {
 }
 
 const DEFAULT_ANALYSIS_VIEW_OPTIONS = {
-  analysisProfileMode: "accDecSpeedAnalysisProfile",
+  analysisMode: "accDecSpeedAnalysisProfile",
   timeSeriesSpeedUnit: "m/s",
   timeMode: "relative",
   statsActivityScopeMode: "all",
@@ -124,7 +124,7 @@ describe("buildAnalysisViewModel", () => {
       analysisResults,
       HIDE_NONE,
       { "a.csv": "#ff0000" },
-      { ...DEFAULT_ANALYSIS_VIEW_OPTIONS, analysisProfileMode: "forceVelocityAnalysisProfile" },
+      { ...DEFAULT_ANALYSIS_VIEW_OPTIONS, analysisMode: "forceVelocityAnalysisProfile" },
     );
     const tableMetricKeys = analysisViewModel.filteredSampleStatsTableRows.map(
       (filteredSampleStatsTableRow) => filteredSampleStatsTableRow.tableMetricKey,
@@ -193,7 +193,7 @@ describe("buildAnalysisViewModel", () => {
       analysisResults,
       HIDE_NONE,
       { "a.csv": "#ff0000" },
-      { ...DEFAULT_ANALYSIS_VIEW_OPTIONS, analysisProfileMode: "forceVelocityAnalysisProfile" },
+      { ...DEFAULT_ANALYSIS_VIEW_OPTIONS, analysisMode: "forceVelocityAnalysisProfile" },
     );
     const [accChartSeries] = analysisViewModel.combinedTimeSeries.accChartSeries;
     expect(accChartSeries.values).toEqual([80, 160]);

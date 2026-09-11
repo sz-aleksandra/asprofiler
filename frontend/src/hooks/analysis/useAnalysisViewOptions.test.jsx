@@ -17,7 +17,7 @@ const DEFAULT_ANALYSIS_VIEW_OPTION_EXPECTATIONS = [
   ["pitchZoneMode", "full"],
   ["eventPhaseMode", "earlyLate"],
   ["statsActivityScopeMode", "all"],
-  ["analysisProfileMode", "accDecSpeedAnalysisProfile"],
+  ["analysisMode", "accDecSpeedAnalysisProfile"],
 ];
 
 const DEFAULT_SPEED_UNIT_EXPECTATIONS = [
@@ -35,7 +35,7 @@ const SETTER_EXPECTATIONS = [
   ["setPitchZoneMode", "pitchZoneMode", "left"],
   ["setEventPhaseMode", "eventPhaseMode", "entire"],
   ["setStatsActivityScopeMode", "statsActivityScopeMode", "high_speed_running"],
-  ["setAnalysisProfileMode", "analysisProfileMode", "forceVelocityAnalysisProfile"],
+  ["setAnalysisMode", "analysisMode", "forceVelocityAnalysisProfile"],
 ];
 
 const SPEED_UNIT_SETTER_EXPECTATIONS = [

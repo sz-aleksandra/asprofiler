@@ -3,7 +3,7 @@ import AccDecDirectionAnalysisProfileTable from "../../../components/analysis/Ac
 import { SelectField } from "../../../ui/form/fields/ParamFields";
 import {
   ACC_DEC_DIRECTION_CONFIGS,
-  ANALYSIS_PROFILE_MODE_OPTIONS,
+  ANALYSIS_MODE_OPTIONS,
 } from "../../../utils/analysis/constants";
 import { buildAccDecDirectionAnalysisProfileTableRows } from "../../../utils/analysis/tables/rows";
 
@@ -26,11 +26,11 @@ export default function AccDecDirectionAnalysisProfileSection({
       <div className={styles.analysisViewOptionsToolbar}>
         <div className={styles.analysisViewOptionsToolbarFieldsRow}>
           <SelectField
-            fieldLabel="Analysis Profile mode"
-            fieldOptions={ANALYSIS_PROFILE_MODE_OPTIONS}
-            fieldValue={analysisViewOptions.analysisProfileMode}
+            fieldLabel="Analysis mode"
+            fieldOptions={ANALYSIS_MODE_OPTIONS}
+            fieldValue={analysisViewOptions.analysisMode}
             isDisabled={false}
-            onFieldChange={analysisViewOptions.setAnalysisProfileMode}
+            onFieldChange={analysisViewOptions.setAnalysisMode}
           />
         </div>
       </div>
